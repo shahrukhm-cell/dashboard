@@ -1,0 +1,70 @@
+/* Restores the original dashboard interaction and glass theme polish. */
+:root {
+    --accent-light: hsl(var(--h), var(--s), 70%);
+    --accent-dark: hsl(var(--h), var(--s), 30%);
+    --accent-glow: hsla(var(--h), var(--s), var(--l), .5);
+    --panel-soft: rgba(255, 255, 255, .045);
+    --shadow: 0 8px 32px rgba(0, 0, 0, .37);
+}
+
+body { transition: background-color .4s ease, color .4s ease; }
+body.light-mode {
+    --bg: #f0f2f5;
+    --panel: rgba(255, 255, 255, .72);
+    --panel-soft: rgba(0, 0, 0, .025);
+    --line: rgba(0, 0, 0, .09);
+    --text: #111827;
+    --muted: #4b5563;
+    --shadow: 0 8px 32px rgba(31, 38, 135, .1);
+}
+
+.background-layer {
+    animation: backgroundPulse 15s ease-in-out infinite;
+    transition: background .4s ease;
+}
+
+.glass-card {
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: transform .4s cubic-bezier(.175, .885, .32, 1.275), box-shadow .4s ease, border-color .4s ease, background-color .4s ease;
+}
+
+.glass-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 -100%;
+    width: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .2), transparent);
+    transition: left .7s ease;
+    pointer-events: none;
+}
+
+.glass-card:hover::before { left: 100%; }
+.glass-card:hover {
+    transform: translateY(-5px) scale(1.015);
+    border-color: hsla(var(--h), var(--s), var(--l), .42);
+    box-shadow: 0 20px 60px hsla(var(--h), var(--s), 30%, .25);
+}
+
+.nav-link, .icon-button, .user-avatar, .button, .activity-item, .search-box {
+    transition: transform .3s ease, background-color .3s ease, border-color .3s ease, color .3s ease, box-shadow .3s ease;
+}
+.nav-link:hover { transform: translateX(4px); }
+.icon-button:hover, .user-avatar:hover { transform: scale(1.06); box-shadow: 0 8px 28px var(--accent-glow); }
+.button-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 32px var(--accent-glow); }
+.activity-item:hover { transform: translateX(7px); border-color: hsla(var(--h), var(--s), var(--l), .35); background: var(--accent-soft); }
+
+.stat-value, .theme-copy strong, h1 { background: linear-gradient(135deg, var(--text), var(--accent)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.stat-icon, .activity-icon { border: 1px solid hsla(var(--h), var(--s), var(--l), .3); }
+.color-picker { box-shadow: 0 8px 32px rgba(0, 0, 0, .2); transition: transform .3s ease, box-shadow .3s ease; }
+.color-picker:hover { transform: scale(1.1); box-shadow: 0 12px 48px var(--accent-glow); }
+
+@keyframes backgroundPulse { 0%, 100% { opacity: 1; } 50% { opacity: .72; } }
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+@media (max-width: 700px) {
+    .glass-card:hover { transform: translateY(-2px); }
+    .activity-item:hover, .nav-link:hover { transform: none; }
+}
