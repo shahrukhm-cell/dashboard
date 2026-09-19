@@ -2,11 +2,16 @@
     <section class="section-heading">
         <div>
             <span class="eyebrow">{{ $tenant->name }}</span>
-            <h2>Jobs</h2>
+            <h2>All jobs</h2>
         </div>
-        @if (auth()->user()->hasPermission('jobs.manage', $tenant))
-            <a class="button button-primary" href="{{ route('jobs.create') }}">Create job</a>
-        @endif
+        <div class="management-actions">
+            @if (auth()->user()->hasPermission('tenant.settings.update', $tenant))
+                <a class="button" href="{{ route('invoice-settings.edit') }}">Invoice settings</a>
+            @endif
+            @if (auth()->user()->hasPermission('jobs.manage', $tenant))
+                <a class="button button-primary" href="{{ route('jobs.create') }}">Create job</a>
+            @endif
+        </div>
     </section>
 
     @if (session('status'))
@@ -22,6 +27,30 @@
                     <option value="{{ $jobStatus }}" @selected($status === $jobStatus)>{{ Str::headline($jobStatus) }}</option>
                 @endforeach
             </select>
+            <select class="auth-input" name="quote_status">
+                <option value="">All quotes</option>
+                @foreach ($quoteStatuses as $jobQuoteStatus)
+                    <option value="{{ $jobQuoteStatus }}" @selected($quoteStatus === $jobQuoteStatus)>{{ Str::headline($jobQuoteStatus) }}</option>
+                @endforeach
+            </select>
+            <select class="auth-input" name="due">
+                <option value="">All due states</option>
+                <option value="due_not_completed" @selected($due === 'due_not_completed')>Due and not completed</option>
+            </select>
+            <select class="auth-input" name="customer_id">
+                <option value="">All customers</option>
+                @foreach ($customers as $customer)
+                    <option value="{{ $customer->id }}" @selected((string) $customerId === (string) $customer->id)>{{ $customer->name }}</option>
+                @endforeach
+            </select>
+            <select class="auth-input" name="team_id">
+                <option value="">All teams</option>
+                @foreach ($teams as $team)
+                    <option value="{{ $team->id }}" @selected((string) $teamId === (string) $team->id)>{{ $team->name }}</option>
+                @endforeach
+            </select>
+            <input class="auth-input" name="from" type="date" value="{{ $from }}">
+            <input class="auth-input" name="to" type="date" value="{{ $to }}">
             <button class="button" type="submit">Filter</button>
         </form>
     </section>
@@ -32,11 +61,11 @@
                 <article class="service-row job-row">
                     <div>
                         <strong><a href="{{ route('jobs.show', $job) }}">{{ $job->job_number }}</a></strong>
-                        <small>{{ $job->customer->name }} · {{ $job->team?->name ?? 'Unassigned' }}</small>
+                        <small>{{ $job->customer->name }} - {{ $job->team?->name ?? 'Unassigned' }}</small>
                     </div>
                     <span>{{ $job->scheduled_at?->format('M j, Y g:i A') ?? 'Not scheduled' }}</span>
-                    @php($lastStatusEvent = $job->statusEvents->first())
-                    <span>{{ $lastStatusEvent?->changed_at?->format('M j, Y g:i A') ?? 'No status time' }}</span>
+                    <span>{{ Str::headline($job->quote_status ?? 'draft') }} quote</span>
+                    <span>{{ $job->before_photos_count ?? 0 }} before / {{ $job->after_photos_count ?? 0 }} after</span>
                     @if ($canViewFinance ?? true)<span>${{ number_format((float) $job->total, 2) }}</span>@else<span>{{ $job->items_count ?? $job->items()->count() }} services</span>@endif
                     <span class="tenant-status tenant-status-{{ in_array($job->status, ['completed']) ? 'active' : ($job->status === 'cancelled' ? 'archived' : 'suspended') }}">{{ Str::headline($job->status) }}</span>
                     @if (auth()->user()->hasPermission('jobs.manage', $tenant))
@@ -54,5 +83,3 @@
         <div class="pagination-wrap">{{ $jobs->links() }}</div>
     </section>
 </x-backend-layout>
-
-

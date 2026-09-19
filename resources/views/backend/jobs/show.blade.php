@@ -5,6 +5,7 @@
             <h2>{{ $job->job_number }}</h2>
         </div>
         <div class="management-actions">
+            <a class="button" href="{{ route('jobs.quote.download', $job) }}">Download quote</a>
             @if ($job->status === 'completed' && $canViewFinance)
                 <a class="button button-primary" href="{{ route('jobs.invoice', $job) }}">Download invoice</a>
             @endif
@@ -40,6 +41,7 @@
                 <dt>Assignee</dt><dd>{{ $job->assignee?->name ?? 'Unassigned' }}</dd>
                 <dt>Address</dt><dd>{{ $job->service_address ?: $job->customer->addressSummary() ?: 'Not added' }}</dd>
                 <dt>Time logged</dt><dd>{{ round($job->timeEntries->sum('minutes') / 60, 2) }} hours</dd>
+                <dt>Quote</dt><dd>{{ Str::headline($job->quote_status ?? 'draft') }}</dd>
                 @if ($canViewFinance)
                     <dt>Total</dt><dd>${{ number_format((float) $job->total, 2) }}</dd>
                     <dt>Customer paid</dt><dd>${{ number_format((float) $job->customerPayments->where('status', 'paid')->sum('amount'), 2) }}</dd>
@@ -70,7 +72,59 @@
         </article>
     </section>
 
-    <section class="glass-card management-card">
+
+    <section class="dashboard-grid management-grid">
+        <article class="glass-card customer-detail-card">
+            <div class="section-heading">
+                <div><span class="eyebrow">Quote</span><h2>Job quote</h2></div>
+                <span class="tenant-status tenant-status-{{ ($job->quote_status ?? 'draft') === 'approved' ? 'active' : (($job->quote_status ?? 'draft') === 'declined' ? 'archived' : 'suspended') }}">{{ Str::headline($job->quote_status ?? 'draft') }}</span>
+            </div>
+            @if (auth()->user()->hasPermission('jobs.manage', $tenant))
+                <form class="customer-toolbar" method="POST" action="{{ route('jobs.quote.update', $job) }}">
+                    @csrf
+                    <select class="auth-input" name="quote_status" required>
+                        @foreach ($quoteStatuses as $jobQuoteStatus)
+                            <option value="{{ $jobQuoteStatus }}" @selected(($job->quote_status ?? 'draft') === $jobQuoteStatus)>{{ Str::headline($jobQuoteStatus) }}</option>
+                        @endforeach
+                    </select>
+                    <button class="button button-primary" type="submit">Update quote</button>
+                </form>
+            @endif
+            <dl class="detail-list">
+                <dt>Sent</dt><dd>{{ $job->quote_sent_at?->format('M j, Y g:i A') ?? 'Not sent' }}</dd>
+                <dt>Approved</dt><dd>{{ $job->quote_approved_at?->format('M j, Y g:i A') ?? 'Not approved' }}</dd>
+            </dl>
+        </article>
+
+        <article class="glass-card customer-detail-card activity-card">
+            <div class="section-heading"><div><span class="eyebrow">Completion</span><h2>Before / after images</h2></div></div>
+            @if ($canUploadJobPhotos)
+                <form class="expense-form" method="POST" action="{{ route('jobs.photos.store', $job) }}" enctype="multipart/form-data">
+                    @csrf
+                    <select class="auth-input" name="type" required>
+                        @foreach ($photoTypes as $photoType)
+                            <option value="{{ $photoType }}">{{ Str::headline($photoType) }}</option>
+                        @endforeach
+                    </select>
+                    <input class="auth-input" name="photo" type="file" accept="image/png,image/jpeg,image/webp" required>
+                    <input class="auth-input" name="caption" placeholder="Caption">
+                    <button class="button button-primary" type="submit">Upload image</button>
+                </form>
+            @endif
+            <div class="job-items-summary">
+                @foreach (['before' => 'Before', 'after' => 'After'] as $type => $label)
+                    <div class="job-summary-row"><span>{{ $label }}</span><strong>{{ $job->photos->where('type', $type)->count() }}</strong></div>
+                    @foreach ($job->photos->where('type', $type) as $photo)
+                        <div class="job-summary-row">
+                            <span><a class="text-link" href="{{ $photo->url() }}" target="_blank" rel="noopener">{{ $photo->caption ?: $label.' image' }}</a> <small>{{ $photo->uploader?->name ?? 'Unknown' }}</small></span>
+                            <strong>{{ $photo->created_at->format('M j') }}</strong>
+                        </div>
+                    @endforeach
+                @endforeach
+            </div>
+            <p class="customer-notes">A job needs at least one before image and one after image before it can be completed.</p>
+        </article>
+    </section>    <section class="glass-card management-card">
         <div class="section-heading">
             <div><span class="eyebrow">Status</span><h2>Job status</h2></div>
             <span class="tenant-status tenant-status-{{ $job->status === 'completed' ? 'active' : ($job->status === 'cancelled' ? 'archived' : 'suspended') }}">{{ Str::headline($job->status) }}</span>
@@ -258,12 +312,22 @@
             </div>
             <div class="expense-list compact">
                 @forelse ($job->customerPayments as $payment)
-                    <article class="expense-summary-row"><div><strong>Customer ${{ number_format((float) $payment->amount, 2) }}</strong><small>{{ Str::headline($payment->method) }} / {{ $payment->reference ?: 'No reference' }}</small></div><span class="tenant-status tenant-status-{{ $payment->status === 'paid' ? 'active' : ($payment->status === 'failed' ? 'archived' : 'suspended') }}">{{ Str::headline($payment->status) }}</span><span>{{ $payment->paid_at->format('M j, Y') }}</span></article>
+                    <form class="payment-row" method="POST" action="{{ route('customer-payments.update', $payment) }}">
+                        @csrf
+                        @method('PATCH')
+                        @include('backend.payments._customer_form', ['payment' => $payment])
+                        <button class="button" type="submit">Save</button>
+                    </form>
                 @empty
                     <p class="customer-notes">No customer payments logged for this job yet.</p>
                 @endforelse
                 @foreach ($job->teamPayments as $payment)
-                    <article class="expense-summary-row"><div><strong>Team ${{ number_format((float) $payment->amount, 2) }}</strong><small>{{ $payment->team?->name ?? $payment->user?->name ?? 'No recipient' }} / {{ Str::headline($payment->method) }}</small></div><span class="tenant-status tenant-status-{{ $payment->status === 'paid' ? 'active' : ($payment->status === 'cancelled' ? 'archived' : 'suspended') }}">{{ Str::headline($payment->status) }}</span><span>{{ $payment->paid_at?->format('M j, Y') ?? 'Unpaid' }}</span></article>
+                    <form class="payment-row team-payment-row" method="POST" action="{{ route('team-payments.update', $payment) }}">
+                        @csrf
+                        @method('PATCH')
+                        @include('backend.payments._team_form', ['payment' => $payment])
+                        <button class="button" type="submit">Save</button>
+                    </form>
                 @endforeach
             </div>
         </section>

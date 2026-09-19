@@ -18,10 +18,10 @@
             <span class="tenant-switcher tenant-switcher-empty">No workspace</span>
         @endif
         <label class="search-box">
-            <span>âŒ•</span>
+            <span><i class="fa-solid fa-magnifying-glass"></i></span>
             <input type="search" placeholder="Search workspace" aria-label="Search workspace">
         </label>
-        <button class="icon-button" type="button" title="Toggle light and dark mode" data-theme-toggle>â—</button>
+        <button class="icon-button" type="button" title="Toggle light and dark mode" data-theme-toggle><i class="fa-solid fa-repeat"></i></button>
         <a class="user-avatar" href="{{ route('profile.edit') }}" title="Open profile">{{ Str::of(auth()->user()->name)->substr(0, 2)->upper() }}</a>
     </div>
 </header>

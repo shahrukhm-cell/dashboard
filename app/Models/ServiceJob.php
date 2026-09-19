@@ -18,6 +18,10 @@ class ServiceJob extends Model
     public const STATUS_IN_PROGRESS = 'in_progress';
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_CANCELLED = 'cancelled';
+    public const QUOTE_DRAFT = 'draft';
+    public const QUOTE_SENT = 'sent';
+    public const QUOTE_APPROVED = 'approved';
+    public const QUOTE_DECLINED = 'declined';
 
     protected $fillable = [
         'tenant_id',
@@ -26,6 +30,9 @@ class ServiceJob extends Model
         'assigned_user_id',
         'job_number',
         'status',
+        'quote_status',
+        'quote_sent_at',
+        'quote_approved_at',
         'scheduled_at',
         'service_address',
         'subtotal',
@@ -38,6 +45,8 @@ class ServiceJob extends Model
     {
         return [
             'scheduled_at' => 'datetime',
+            'quote_sent_at' => 'datetime',
+            'quote_approved_at' => 'datetime',
             'subtotal' => 'decimal:2',
             'discount' => 'decimal:2',
             'total' => 'decimal:2',
@@ -47,6 +56,11 @@ class ServiceJob extends Model
     public static function statuses(): array
     {
         return [self::STATUS_DRAFT, self::STATUS_SCHEDULED, self::STATUS_ASSIGNED, self::STATUS_APPROVED, self::STATUS_IN_PROGRESS, self::STATUS_COMPLETED, self::STATUS_CANCELLED];
+    }
+
+    public static function quoteStatuses(): array
+    {
+        return [self::QUOTE_DRAFT, self::QUOTE_SENT, self::QUOTE_APPROVED, self::QUOTE_DECLINED];
     }
 
     public function tenant(): BelongsTo
@@ -103,6 +117,23 @@ class ServiceJob extends Model
     {
         return $this->hasMany(TeamPayment::class);
     }
+
+    public function photos(): HasMany
+    {
+        return $this->hasMany(JobPhoto::class);
+    }
+
+    public function beforePhotos(): HasMany
+    {
+        return $this->photos()->where('type', JobPhoto::TYPE_BEFORE);
+    }
+
+    public function afterPhotos(): HasMany
+    {
+        return $this->photos()->where('type', JobPhoto::TYPE_AFTER);
+    }
 }
+
+
 
 

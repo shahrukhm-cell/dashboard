@@ -13,9 +13,11 @@ use App\Http\Controllers\Backend\RoleController;
 use App\Http\Controllers\Backend\ServiceController;
 use App\Http\Controllers\Backend\JobWorkController;
 use App\Http\Controllers\Backend\JobInvoiceController;
+use App\Http\Controllers\Backend\InvoiceSettingController;
 use App\Http\Controllers\Backend\ServiceJobController;
 use App\Http\Controllers\Backend\TenantUserController;
 use App\Http\Controllers\Backend\TimeEntryController;
+use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -38,18 +40,26 @@ Route::post('/logout', [AuthController::class, 'logout'])
     ->name('logout');
 
 Route::middleware('auth')->group(function () {
-    Route::view('/profile', 'profile.simple')->name('profile.edit');
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::get('reports', ReportController::class)->name('reports.index');
     Route::resource('customers', CustomerController::class)->except(['destroy']);
     Route::resource('services', ServiceController::class)->only(['index', 'store', 'edit', 'update']);
     Route::resource('jobs', ServiceJobController::class)->except(['destroy']);
     Route::post('jobs/{job}/status', [ServiceJobController::class, 'updateStatus'])->name('jobs.status.update');
+    Route::post('jobs/{job}/quote', [ServiceJobController::class, 'updateQuote'])->name('jobs.quote.update');
+    Route::get('jobs/{job}/quote', [JobInvoiceController::class, 'quote'])->name('jobs.quote.download');
+    Route::post('jobs/{job}/photos', [ServiceJobController::class, 'storePhoto'])->name('jobs.photos.store');
     Route::get('jobs/{job}/invoice', JobInvoiceController::class)->name('jobs.invoice');
+    Route::get('invoice-settings', [InvoiceSettingController::class, 'edit'])->name('invoice-settings.edit');
+    Route::patch('invoice-settings', [InvoiceSettingController::class, 'update'])->name('invoice-settings.update');
     Route::post('jobs/{job}/work/start', [JobWorkController::class, 'start'])->name('jobs.work.start');
     Route::post('jobs/{job}/work/break/start', [JobWorkController::class, 'startBreak'])->name('jobs.work.break.start');
     Route::post('jobs/{job}/work/break/end', [JobWorkController::class, 'endBreak'])->name('jobs.work.break.end');
     Route::post('jobs/{job}/work/end', [JobWorkController::class, 'end'])->name('jobs.work.end');
-    Route::resource('teams', TeamController::class)->only(['index', 'store', 'update']);
+    Route::resource('teams', TeamController::class)->only(['index', 'store', 'show', 'update']);
+    Route::get('teams/{team}/members/{user}', [TeamController::class, 'member'])->name('teams.members.show');
+    Route::post('teams/{team}/members/{user}/attendance', [TeamController::class, 'storeAttendance'])->name('teams.members.attendance.store');
     Route::resource('time-entries', TimeEntryController::class)->only(['index', 'store']);
     Route::resource('expenses', ExpenseController::class)->only(['index', 'store', 'update']);
     Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
@@ -70,11 +80,19 @@ Route::middleware('auth')->group(function () {
     Route::post('/tenants/switch', [TenantController::class, 'switch'])->name('tenant.switch');
     Route::get('/tenants/{tenant}/users', [TenantUserController::class, 'index'])->name('tenant.users.index');
     Route::post('/tenants/{tenant}/users', [TenantUserController::class, 'store'])->name('tenant.users.store');
+    Route::patch('/tenants/{tenant}/users/{user}', [TenantUserController::class, 'update'])->name('tenant.users.update');
+    Route::post('/tenants/{tenant}/team-leaves', [TenantUserController::class, 'storeLeave'])->name('tenant.team-leaves.store');
+    Route::get('/tenants/{tenant}/roles', [RoleController::class, 'index'])->name('tenant.roles.index');
     Route::post('/tenants/{tenant}/roles', [RoleController::class, 'store'])->name('tenant.roles.store');
     Route::patch('/tenants/{tenant}/roles/{role}', [RoleController::class, 'update'])->name('tenant.roles.update');
     Route::delete('/tenants/{tenant}/roles/{role}', [RoleController::class, 'destroy'])->name('tenant.roles.destroy');
     Route::post('/tenants/{tenant}/settings/theme', [TenantController::class, 'updateTheme'])->name('tenant.theme.update');
 });
+
+
+
+
+
 
 
 

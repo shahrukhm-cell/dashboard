@@ -10,6 +10,7 @@
     </section>
 
     @if (session('status'))
+    
         <p class="status-message">{{ session('status') }}</p>
     @endif
 

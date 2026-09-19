@@ -96,9 +96,21 @@ class JobWorkController extends Controller
 
         abort_unless($isAssigned, 404);
 
+        if (! $request->user()->hasPermission('jobs.manage', $tenant)) {
+            abort_unless($request->user()->hasTenantRole($tenant, 'team-lead'), 403);
+            abort_unless(in_array($job->status, [ServiceJob::STATUS_APPROVED, ServiceJob::STATUS_IN_PROGRESS], true), 404);
+        }
+
         return [$tenant, $job->workEvents()->oldest('occurred_at')->get()];
     }
 
+
+    private function ensureCompletionReady(ServiceJob $job): void
+    {
+        $job->loadCount(['beforePhotos', 'afterPhotos']);
+
+        abort_if($job->before_photos_count < 1 || $job->after_photos_count < 1, 422, 'Upload at least one before photo and one after photo before completing the job.');
+    }
     private function recordEvent(Tenant $tenant, ServiceJob $job, Request $request, string $type): JobWorkEvent
     {
         return JobWorkEvent::create([
@@ -173,3 +185,4 @@ class JobWorkController extends Controller
         ];
     }
 }
+

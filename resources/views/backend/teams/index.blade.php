@@ -11,6 +11,16 @@
     @endif
 
     <section class="glass-card management-card">
+        <form class="customer-toolbar" method="GET" action="{{ route('teams.index') }}">
+            <input class="auth-input" name="search" value="{{ $search }}" placeholder="Search teams or members">
+            <button class="button" type="submit">Search</button>
+            @if ($search !== '')
+                <a class="button" href="{{ route('teams.index') }}">Clear</a>
+            @endif
+        </form>
+    </section>
+
+    <section class="glass-card management-card">
         <h2>Create team</h2>
         <form class="team-form" method="POST" action="{{ route('teams.store') }}">
             @csrf
@@ -46,10 +56,11 @@
                     <span class="tenant-status tenant-status-{{ $team->is_active ? 'active' : 'archived' }}">{{ $team->is_active ? 'Active' : 'Inactive' }}</span>
                     <span class="eyebrow">{{ $team->users->count() }} members</span>
                 </div>
-                <h2>{{ $team->name }}</h2>
+                <h2><a href="{{ route('teams.show', $team) }}">{{ $team->name }}</a></h2>
                 <p>{{ $team->description ?: 'No description added.' }}</p>
                 <p><strong>Lead:</strong> {{ $teamLead?->name ?? 'No lead selected' }}</p>
                 <p><strong>Members:</strong> {{ $team->memberNames() ?: 'No members yet' }}</p>
+                <a class="button" href="{{ route('teams.show', $team) }}">View members</a>
 
                 <form class="team-form" method="POST" action="{{ route('teams.update', $team) }}">
                     @csrf

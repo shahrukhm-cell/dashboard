@@ -12,12 +12,35 @@ class JobInvoiceController extends Controller
 {
     public function __invoke(Request $request, ServiceJob $job): Response
     {
+        $tenant = $this->authorizedTenantJob($request, $job);
+        abort_unless($job->status === ServiceJob::STATUS_COMPLETED, 422, 'Invoice can be downloaded after job completion.');
+
+        $job->load(['customer', 'items.service', 'customerPayments']);
+
+        return $this->pdfResponse(
+            $this->makePdf($tenant, $job, (string) $tenant->invoiceSetting('heading', 'Customer invoice'), true),
+            'invoice-'.$job->job_number.'.pdf'
+        );
+    }
+
+    public function quote(Request $request, ServiceJob $job): Response
+    {
+        $tenant = $this->authorizedTenantJob($request, $job);
+        $job->load(['customer', 'items.service', 'customerPayments']);
+
+        return $this->pdfResponse(
+            $this->makePdf($tenant, $job, 'Job quote', false),
+            'quote-'.$job->job_number.'.pdf'
+        );
+    }
+
+    private function authorizedTenantJob(Request $request, ServiceJob $job): Tenant
+    {
         $tenant = app()->bound('currentTenant') ? app('currentTenant') : null;
 
         abort_unless($tenant, 403, 'Select a workspace first.');
         abort_unless((int) $job->tenant_id === (int) $tenant->id, 404);
         abort_unless($request->user()->hasPermission('jobs.view', $tenant), 403);
-        abort_unless($job->status === ServiceJob::STATUS_COMPLETED, 422, 'Invoice can be downloaded after job completion.');
 
         if ($request->user()->isFieldStaff($tenant)) {
             $job->loadMissing('team.users');
@@ -28,25 +51,26 @@ class JobInvoiceController extends Controller
             );
         }
 
-        $job->load(['customer', 'items.service', 'customerPayments']);
+        return $tenant;
+    }
 
-        $pdf = $this->makePdf($tenant, $job);
-        $filename = 'invoice-'.$job->job_number.'.pdf';
-
+    private function pdfResponse(string $pdf, string $filename): Response
+    {
         return response($pdf, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
-    private function makePdf(Tenant $tenant, ServiceJob $job): string
+    private function makePdf(Tenant $tenant, ServiceJob $job, string $title, bool $includePayments): string
     {
         $paid = (float) $job->customerPayments->where('status', 'paid')->sum('amount');
         $balance = max(0, (float) $job->total - $paid);
         $lines = [
             $tenant->name,
-            'Customer invoice',
-            'Invoice: '.$job->job_number,
+            $title,
+            'Job: '.$job->job_number,
+            'Quote status: '.str_replace('_', ' ', (string) ($job->quote_status ?? ServiceJob::QUOTE_DRAFT)),
             'Date: '.now()->format('M j, Y'),
             'Customer: '.$job->customer->name,
             'Phone: '.($job->customer->phone ?: 'Not added'),
@@ -64,11 +88,20 @@ class JobInvoiceController extends Controller
             'Subtotal: $'.number_format((float) $job->subtotal, 2),
             'Discount: $'.number_format((float) $job->discount, 2),
             'Total: $'.number_format((float) $job->total, 2),
-            'Paid: $'.number_format($paid, 2),
-            'Balance due: $'.number_format($balance, 2),
-            '',
-            'Thank you.',
         ]);
+
+        if ($includePayments && $tenant->invoiceSetting('show_payments', true)) {
+            $lines[] = 'Paid: $'.number_format($paid, 2);
+            $lines[] = 'Balance due: $'.number_format($balance, 2);
+        }
+
+        if ($terms = $tenant->invoiceSetting('terms')) {
+            $lines[] = '';
+            $lines[] = (string) $terms;
+        }
+
+        $lines[] = '';
+        $lines[] = (string) $tenant->invoiceSetting('footer', 'Thank you.');
 
         return $this->renderSimplePdf($lines);
     }

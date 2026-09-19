@@ -77,6 +77,10 @@
             <input class="auth-input" name="name" placeholder="Full name" required>
             <input class="auth-input" name="email" type="email" placeholder="Email address" required>
             <input class="auth-input" name="password" type="password" placeholder="Temporary password" required>
+            <input class="auth-input" name="phone" placeholder="Phone">
+            <input class="auth-input" name="address" placeholder="Address">
+            <input class="auth-input" name="reference" placeholder="Reference">
+            <input class="auth-input" name="emergency_contact" placeholder="Emergency contact">
             <select class="auth-input" name="role_id" required>
                 @foreach($roles as $role)
                     <option value="{{ $role->id }}">{{ $role->name }}</option>
@@ -93,44 +97,31 @@
                     <span class="eyebrow">Access control</span>
                     <h2>Roles & permissions</h2>
                 </div>
-            </div>
-
-            <form class="role-create-form" method="POST" action="{{ route('tenant.roles.store', $tenant) }}">
-                @csrf
-                <input class="auth-input" name="name" placeholder="New role name" required>
-                <div class="permission-grid compact">
-                    @foreach ($permissions as $permission)
-                        <label class="permission-check">
-                            <input type="checkbox" name="permissions[]" value="{{ $permission->id }}">
-                            <span>{{ $permission->name }}</span>
-                        </label>
-                    @endforeach
-                </div>
-                <button class="button button-primary" type="submit">Create role</button>
-            </form>
-
-            <div class="role-list">
-                @foreach ($roles as $role)
-                    <form class="role-card" method="POST" action="{{ route('tenant.roles.update', [$tenant, $role]) }}">
-                        @csrf
-                        @method('PATCH')
-                        <div class="role-card-header">
-                            <input class="auth-input" name="name" value="{{ $role->name }}" required>
-                            <button class="button button-primary" type="submit">Save role</button>
-                        </div>
-                        <div class="permission-grid">
-                            @foreach ($permissions as $permission)
-                                <label class="permission-check">
-                                    <input type="checkbox" name="permissions[]" value="{{ $permission->id }}" @checked($role->permissions->contains($permission))>
-                                    <span>{{ $permission->name }}</span>
-                                </label>
-                            @endforeach
-                        </div>
-                    </form>
-                @endforeach
+                <a class="button" href="{{ route('tenant.roles.index', $tenant) }}">Manage roles</a>
             </div>
         </section>
     @endif
+
+    <section class="glass-card management-card">
+        <h2>Record leave</h2>
+        <form class="management-form" method="POST" action="{{ route('tenant.team-leaves.store', $tenant) }}">
+            @csrf
+            <select class="auth-input" name="user_id" required>
+                @foreach ($users as $user)
+                    <option value="{{ $user->id }}">{{ $user->name }}</option>
+                @endforeach
+            </select>
+            <input class="auth-input" name="starts_at" type="date" required>
+            <input class="auth-input" name="ends_at" type="date" required>
+            <select class="auth-input" name="status" required>
+                @foreach ($leaveStatuses as $leaveStatus)
+                    <option value="{{ $leaveStatus }}">{{ Str::headline($leaveStatus) }}</option>
+                @endforeach
+            </select>
+            <input class="auth-input" name="reason" placeholder="Reason">
+            <button class="button button-primary" type="submit">Save leave</button>
+        </form>
+    </section>
 
     <section class="glass-card management-card">
         <h2>Members</h2>
@@ -141,9 +132,33 @@
                     <div>
                         <strong>{{ $user->name }}</strong>
                         <p>{{ $user->email }} / {{ $user->roles->pluck('name')->join(', ') ?: 'No role' }}</p>
+                        <p>Phone: {{ $user->phone ?: 'Not added' }} / Address: {{ $user->address ?: 'Not added' }}</p>
+                        <p>Reference: {{ $user->reference ?: 'Not added' }} / Emergency: {{ $user->emergency_contact ?: 'Not added' }}</p>
+                        <p>Latest leave: {{ $user->leaves->first()?->starts_at?->format('M j, Y') ?? 'No leave recorded' }}</p>
+                        <form class="management-form" method="POST" action="{{ route('tenant.users.update', [$tenant, $user]) }}">
+                            @csrf
+                            @method('PATCH')
+                            <input class="auth-input" name="name" value="{{ $user->name }}" required>
+                            <input class="auth-input" name="email" type="email" value="{{ $user->email }}" required>
+                            <input class="auth-input" name="phone" value="{{ $user->phone }}" placeholder="Phone">
+                            <input class="auth-input" name="address" value="{{ $user->address }}" placeholder="Address">
+                            <input class="auth-input" name="reference" value="{{ $user->reference }}" placeholder="Reference">
+                            <input class="auth-input" name="emergency_contact" value="{{ $user->emergency_contact }}" placeholder="Emergency contact">
+                            <select class="auth-input" name="role_id" required>
+                                @foreach($roles as $role)
+                                    <option value="{{ $role->id }}" @selected($user->roles->contains('id', $role->id))>{{ $role->name }}</option>
+                                @endforeach
+                            </select>
+                            <button class="button" type="submit">Update profile</button>
+                        </form>
                     </div>
                 </div>
             @endforeach
         </div>
     </section>
 </x-backend-layout>
+
+
+
+
+

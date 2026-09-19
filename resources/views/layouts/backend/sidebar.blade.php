@@ -5,9 +5,9 @@
         @if ($sidebarTenant?->logoUrl())
             <img class="brand-logo" src="{{ $sidebarTenant->logoUrl() }}" alt="{{ $sidebarTenant->brandName() }} logo">
         @else
-            <span class="brand-mark">{{ Str::of($sidebarTenant?->brandName() ?? 'Nexus')->substr(0, 1)->upper() }}</span>
+            <span class="brand-mark">{{ Str::of($sidebarTenant?->brandName() ?? 'Servico Fusion')->substr(0, 1)->upper() }}</span>
         @endif
-        <span class="brand-name">{{ $sidebarTenant?->brandName() ?? 'Nexus' }}</span>
+        <span class="brand-name">{{ $sidebarTenant?->brandName() ?? 'Servico Fusion' }}</span>
     </a>
 
     <p class="nav-label">Workspace</p>
@@ -26,12 +26,19 @@
             <a class="nav-link" href="{{ route('services.index') }}"><span class="nav-symbol">S</span> Services</a>
         @endif
 
+        @if ($sidebarTenant && auth()->user()->hasPermission('jobs.view', $sidebarTenant))
+            <a class="nav-link" href="{{ route('jobs.index') }}"><span class="nav-symbol">J</span> Jobs</a>
+        @endif
+
         @if ($sidebarTenant && auth()->user()->hasPermission('jobs.assign', $sidebarTenant))
             <a class="nav-link" href="{{ route('teams.index') }}"><span class="nav-symbol">M</span> Teams</a>
         @endif
 
         @if ($sidebarTenant && auth()->user()->hasPermission('tenant.settings.update', $sidebarTenant))
             <a class="nav-link" href="{{ route('tenant.users.index', $sidebarTenant) }}"><span class="nav-symbol">G</span> Settings</a>
+            @if (auth()->user()->hasPermission('roles.manage', $sidebarTenant))
+                <a class="nav-link" href="{{ route('tenant.roles.index', $sidebarTenant) }}"><span class="nav-symbol">P</span> Roles</a>
+            @endif
         @endif
 
         @if (auth()->user()->is_super_admin)
@@ -47,9 +54,14 @@
             <div class="plan-meter"><span></span></div>
             <small>72% of monthly usage</small>
         </div>
+    </div> --}}
+    <div class="sidebar-footer">
         <form method="POST" action="{{ route('logout') }}">
             @csrf
             <button class="nav-link logout-button" type="submit"><span class="nav-symbol">X</span> Sign out</button>
         </form>
-    </div> --}}
+    </div>
 </aside>
+
+
+

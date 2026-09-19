@@ -1,5 +1,5 @@
 <x-guest-layout>
-    <div class="auth-heading"><span class="eyebrow">Welcome back</span><h2>Sign in to Nexus</h2><p>Continue to your workspace.</p></div>
+    <div class="auth-heading"><span class="eyebrow">Welcome back</span><h2>Sign in to Servico Fusion</h2><p>Continue to your workspace.</p></div>
     @if ($errors->any())
         <div class="auth-errors">{{ $errors->first() }}</div>
     @endif

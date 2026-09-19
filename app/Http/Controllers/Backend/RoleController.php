@@ -9,9 +9,21 @@ use App\Models\Tenant;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 
 class RoleController extends Controller
 {
+    public function index(Request $request, Tenant $tenant): View
+    {
+        abort_unless($request->user()->hasPermission('roles.manage', $tenant), 403);
+
+        return view('backend.tenants.roles', [
+            'tenant' => $tenant,
+            'roles' => Role::where('tenant_id', $tenant->id)->with('permissions')->orderBy('name')->get(),
+            'permissions' => Permission::orderBy('name')->get(),
+        ]);
+    }
+
     public function store(Request $request, Tenant $tenant): RedirectResponse
     {
         abort_unless($request->user()->hasPermission('roles.manage', $tenant), 403);

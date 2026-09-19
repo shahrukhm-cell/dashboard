@@ -68,6 +68,12 @@ class CustomerController extends Controller
         return view('backend.customers.show', [
             'tenant' => $tenant,
             'customer' => $customer,
+            'dueNotCompletedJobs' => ServiceJob::where('tenant_id', $tenant->id)
+                ->where('customer_id', $customer->id)
+                ->whereNotIn('status', [ServiceJob::STATUS_COMPLETED, ServiceJob::STATUS_CANCELLED])
+                ->whereNotNull('scheduled_at')
+                ->where('scheduled_at', '<=', now())
+                ->count(),
             'jobs' => ServiceJob::where('tenant_id', $tenant->id)
                 ->where('customer_id', $customer->id)
                 ->with(['team', 'assignee'])->withCount('items')
@@ -129,4 +135,5 @@ class CustomerController extends Controller
         ]);
     }
 }
+
 

@@ -72,7 +72,7 @@ a {
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 24px;
-    backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);    overflow: scroll;
 }
 .brand {
     display: flex;
@@ -168,7 +168,7 @@ a {
 .main-content {
     width: calc(100% - 266px);
     margin-left: 266px;
-    padding: 38px clamp(18px, 4vw, 58px);
+        padding: 23px clamp(18px, 2vw, 58px);
 }
 .topbar {
     display: flex;
@@ -479,6 +479,11 @@ h2 {
 .auth-input:focus {
     border-color: var(--accent);
 }
+.auth-input > option{
+    color: var(--text);
+    background: #34a37a;
+}
+
 .auth-options {
     display: flex;
     align-items: center;
@@ -638,3 +643,4 @@ h2 {
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid var(--line);
 }
+

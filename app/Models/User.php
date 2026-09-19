@@ -24,6 +24,10 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone',
+        'address',
+        'reference',
+        'emergency_contact',
         'password',
         'is_super_admin',
     ];
@@ -85,6 +89,11 @@ class User extends Authenticatable
     public function teamPayments(): HasMany
     {
         return $this->hasMany(TeamPayment::class);
+    }
+
+    public function leaves(): HasMany
+    {
+        return $this->hasMany(TeamLeave::class);
     }
 
     public function canAccessTenant(Tenant $tenant): bool

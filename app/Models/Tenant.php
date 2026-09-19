@@ -124,8 +124,19 @@ class Tenant extends Model
         return $this->logoPath() ? asset('storage/'.$this->logoPath()) : null;
     }
 
+    public function invoiceSettings(): array
+    {
+        return $this->settings['invoice'] ?? [];
+    }
+
+    public function invoiceSetting(string $key, mixed $default = null): mixed
+    {
+        return $this->invoiceSettings()[$key] ?? $default;
+    }
+
     public function isActive(): bool
     {
         return $this->status === self::STATUS_ACTIVE;
     }
 }
+

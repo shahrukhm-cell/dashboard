@@ -1,29 +1,55 @@
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Profile') }}
-        </h2>
-    </x-slot>
-
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.update-profile-information-form')
-                </div>
-            </div>
-
-            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.update-password-form')
-                </div>
-            </div>
-
-            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    @include('profile.partials.delete-user-form')
-                </div>
-            </div>
+<x-backend-layout title="Profile">
+    <section class="section-heading">
+        <div>
+            <span class="eyebrow">Account</span>
+            <h2>My profile</h2>
         </div>
-    </div>
-</x-app-layout>
+    </section>
+
+    @if (session('status') === 'profile-updated')
+        <p class="status-message">Profile updated.</p>
+    @endif
+
+    <section class="glass-card management-card">
+        <form class="customer-form-grid" method="POST" action="{{ route('profile.update') }}">
+            @csrf
+            @method('PATCH')
+
+            <label class="auth-field">
+                <span>Name</span>
+                <input class="auth-input" name="name" value="{{ old('name', $user->name) }}" required>
+            </label>
+            <label class="auth-field">
+                <span>Email</span>
+                <input class="auth-input" name="email" type="email" value="{{ old('email', $user->email) }}" required>
+            </label>
+            <label class="auth-field">
+                <span>Phone</span>
+                <input class="auth-input" name="phone" value="{{ old('phone', $user->phone) }}">
+            </label>
+            <label class="auth-field">
+                <span>Emergency contact</span>
+                <input class="auth-input" name="emergency_contact" value="{{ old('emergency_contact', $user->emergency_contact) }}">
+            </label>
+            <label class="auth-field customer-span-2">
+                <span>Address</span>
+                <input class="auth-input" name="address" value="{{ old('address', $user->address) }}">
+            </label>
+            <label class="auth-field customer-span-2">
+                <span>Reference</span>
+                <input class="auth-input" name="reference" value="{{ old('reference', $user->reference) }}">
+            </label>
+
+            <button class="button button-primary" type="submit">Update profile</button>
+        </form>
+
+        @if ($errors->any())
+            <div class="auth-errors customer-errors">
+                @foreach ($errors->all() as $error)
+                    <p>{{ $error }}</p>
+                @endforeach
+            </div>
+        @endif
+    </section>
+</x-backend-layout>
+

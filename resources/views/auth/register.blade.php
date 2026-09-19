@@ -1,5 +1,5 @@
 <x-guest-layout>
-    <div class="auth-heading"><span class="eyebrow">Start free</span><h2>Create your workspace</h2><p>Set up your Nexus account in under a minute.</p></div>
+    <div class="auth-heading"><span class="eyebrow">Start free</span><h2>Create your workspace</h2><p>Set up your Servico Fusion account in under a minute.</p></div>
     @if ($errors->any()) <div class="auth-errors">{{ $errors->first() }}</div> @endif
     <form method="POST" action="{{ route('register') }}">
         @csrf

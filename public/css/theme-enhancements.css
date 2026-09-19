@@ -42,9 +42,9 @@ body.light-mode {
 
 .glass-card:hover::before { left: 100%; }
 .glass-card:hover {
-    transform: translateY(-5px) scale(1.015);
+    transform: translateY(-2px) scale(1.0);
     border-color: hsla(var(--h), var(--s), var(--l), .42);
-    box-shadow: 0 20px 60px hsla(var(--h), var(--s), 30%, .25);
+    box-shadow: 0 20px 40px hsla(var(--h), var(--s), 30%, .25);
 }
 
 .nav-link, .icon-button, .user-avatar, .button, .activity-item, .search-box {

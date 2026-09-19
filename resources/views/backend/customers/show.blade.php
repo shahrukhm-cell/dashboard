@@ -28,6 +28,7 @@
                 <dt>Email</dt><dd>{{ $customer->email ?: 'Not added' }}</dd>
                 <dt>Phone</dt><dd>{{ $customer->phone ?: 'Not added' }}</dd>
                 <dt>Address</dt><dd>{{ $customer->addressSummary() ?: 'Not added' }}</dd>
+                <dt>Due not completed</dt><dd><a class="text-link" href="{{ route('jobs.index', ['customer_id' => $customer->id, 'due' => 'due_not_completed']) }}">{{ $dueNotCompletedJobs }} jobs</a></dd>
             </dl>
         </article>
 
@@ -72,3 +73,4 @@
         </div>
     </section>
 </x-backend-layout>
+
