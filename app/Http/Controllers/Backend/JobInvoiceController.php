@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\ServiceJob;
 use App\Models\Tenant;
 use Illuminate\Http\Request;
+use Dompdf\Dompdf;
+use Dompdf\Options;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 class JobInvoiceController extends Controller
@@ -15,23 +18,20 @@ class JobInvoiceController extends Controller
         $tenant = $this->authorizedTenantJob($request, $job);
         abort_unless($job->status === ServiceJob::STATUS_COMPLETED, 422, 'Invoice can be downloaded after job completion.');
 
-        $job->load(['customer', 'items.service', 'customerPayments']);
-
-        return $this->pdfResponse(
-            $this->makePdf($tenant, $job, (string) $tenant->invoiceSetting('heading', 'Customer invoice'), true),
-            'invoice-'.$job->job_number.'.pdf'
+        return $this->downloadDocument(
+            $tenant,
+            $job,
+            (string) $tenant->invoiceSetting('heading', 'Customer invoice'),
+            true,
+            'invoice'
         );
     }
 
     public function quote(Request $request, ServiceJob $job): Response
     {
         $tenant = $this->authorizedTenantJob($request, $job);
-        $job->load(['customer', 'items.service', 'customerPayments']);
 
-        return $this->pdfResponse(
-            $this->makePdf($tenant, $job, 'Job quote', false),
-            'quote-'.$job->job_number.'.pdf'
-        );
+        return $this->downloadDocument($tenant, $job, 'Job quote', false, 'quote');
     }
 
     private function authorizedTenantJob(Request $request, ServiceJob $job): Tenant
@@ -54,107 +54,53 @@ class JobInvoiceController extends Controller
         return $tenant;
     }
 
-    private function pdfResponse(string $pdf, string $filename): Response
+    private function downloadDocument(Tenant $tenant, ServiceJob $job, string $title, bool $includePayments, string $type): Response
     {
-        return response($pdf, 200, [
+        $job->load(['customer', 'items.service', 'customerPayments']);
+
+        $html = view('backend.jobs.invoice', [
+            'tenant' => $tenant,
+            'job' => $job,
+            'title' => $title,
+            'type' => $type,
+            'includePayments' => $includePayments,
+            'paid' => (float) $job->customerPayments->where('status', 'paid')->sum('amount'),
+            'showPayments' => (bool) $tenant->invoiceSetting('show_payments', true),
+            'accent' => (string) $tenant->invoiceSetting('accent_color', $tenant->themeColor()),
+            'terms' => $tenant->invoiceSetting('terms'),
+            'footer' => (string) $tenant->invoiceSetting('footer', 'Thank you.'),
+            'logoPath' => $this->logoPath($tenant),
+        ])->render();
+
+        $options = new Options();
+        $options->set('defaultFont', 'Helvetica');
+        $options->set('isRemoteEnabled', true);
+        $options->set('chroot', [public_path(), storage_path('app/public')]);
+
+        $pdf = new Dompdf($options);
+        $pdf->loadHtml($html);
+        $pdf->setPaper('a4', 'portrait');
+        $pdf->render();
+
+        return response($pdf->output(), 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Content-Disposition' => 'attachment; filename="'.$this->filename($type, $job).'"',
         ]);
     }
 
-    private function makePdf(Tenant $tenant, ServiceJob $job, string $title, bool $includePayments): string
+    private function filename(string $type, ServiceJob $job): string
     {
-        $paid = (float) $job->customerPayments->where('status', 'paid')->sum('amount');
-        $balance = max(0, (float) $job->total - $paid);
-        $lines = [
-            $tenant->name,
-            $title,
-            'Job: '.$job->job_number,
-            'Quote status: '.str_replace('_', ' ', (string) ($job->quote_status ?? ServiceJob::QUOTE_DRAFT)),
-            'Date: '.now()->format('M j, Y'),
-            'Customer: '.$job->customer->name,
-            'Phone: '.($job->customer->phone ?: 'Not added'),
-            'Address: '.($job->service_address ?: $job->customer->addressSummary() ?: 'Not added'),
-            '',
-            'Services',
-        ];
-
-        foreach ($job->items as $item) {
-            $lines[] = $item->name.' - '.$item->quantity.' '.$item->unit_type.' x $'.number_format((float) $item->unit_price, 2).' = $'.number_format((float) $item->line_total, 2);
-        }
-
-        $lines = array_merge($lines, [
-            '',
-            'Subtotal: $'.number_format((float) $job->subtotal, 2),
-            'Discount: $'.number_format((float) $job->discount, 2),
-            'Total: $'.number_format((float) $job->total, 2),
-        ]);
-
-        if ($includePayments && $tenant->invoiceSetting('show_payments', true)) {
-            $lines[] = 'Paid: $'.number_format($paid, 2);
-            $lines[] = 'Balance due: $'.number_format($balance, 2);
-        }
-
-        if ($terms = $tenant->invoiceSetting('terms')) {
-            $lines[] = '';
-            $lines[] = (string) $terms;
-        }
-
-        $lines[] = '';
-        $lines[] = (string) $tenant->invoiceSetting('footer', 'Thank you.');
-
-        return $this->renderSimplePdf($lines);
+        return Str::slug($type.'-'.$job->job_number).'.pdf';
     }
 
-    private function renderSimplePdf(array $lines): string
+    private function logoPath(Tenant $tenant): ?string
     {
-        $content = "BT\n/F1 18 Tf\n50 780 Td\n";
-        $first = true;
-
-        foreach ($lines as $line) {
-            $fontSize = $first ? 18 : 10;
-            $leading = $first ? 26 : 15;
-            $content .= '/F1 '.$fontSize." Tf\n";
-            $content .= '('.$this->pdfText($line).') Tj' . "\n";
-            $content .= '0 -'.$leading." Td\n";
-            $first = false;
+        if (! $tenant->logoPath()) {
+            return null;
         }
 
-        $content .= "ET\n";
+        $path = public_path('storage/'.$tenant->logoPath());
 
-        $objects = [];
-        $objects[] = "<< /Type /Catalog /Pages 2 0 R >>";
-        $objects[] = "<< /Type /Pages /Kids [3 0 R] /Count 1 >>";
-        $objects[] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>";
-        $objects[] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
-        $objects[] = "<< /Length ".strlen($content)." >>\nstream\n".$content."endstream";
-
-        $pdf = "%PDF-1.4\n";
-        $offsets = [0];
-
-        foreach ($objects as $index => $object) {
-            $offsets[] = strlen($pdf);
-            $number = $index + 1;
-            $pdf .= $number." 0 obj\n".$object."\nendobj\n";
-        }
-
-        $xref = strlen($pdf);
-        $pdf .= "xref\n0 ".(count($objects) + 1)."\n";
-        $pdf .= "0000000000 65535 f \n";
-
-        for ($i = 1; $i <= count($objects); $i++) {
-            $pdf .= str_pad((string) $offsets[$i], 10, '0', STR_PAD_LEFT)." 00000 n \n";
-        }
-
-        $pdf .= "trailer\n<< /Size ".(count($objects) + 1)." /Root 1 0 R >>\nstartxref\n".$xref."\n%%EOF";
-
-        return $pdf;
-    }
-
-    private function pdfText(string $text): string
-    {
-        $text = str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $text);
-
-        return preg_replace('/[^\x20-\x7E]/', '-', $text) ?? '';
+        return is_file($path) ? $path : null;
     }
 }

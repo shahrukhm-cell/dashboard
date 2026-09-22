@@ -13,6 +13,13 @@
         <p class="status-message">{{ session('status') }}</p>
     @endif
 
+    @if ($canManageExpenses)
+        <section class="dashboard-grid management-grid finance-summary-grid">
+            <article class="glass-card stat-card"><span class="stat-label">Job expenses</span><strong class="stat-value">${{ number_format((float) $jobExpenseTotal, 2) }}</strong><span class="stat-change negative">Assigned to jobs</span></article>
+            <article class="glass-card stat-card"><span class="stat-label">Company expenses</span><strong class="stat-value">${{ number_format((float) $companyExpenseTotal, 2) }}</strong><span class="stat-change negative">Rent, shop, overhead</span></article>
+        </section>
+    @endif
+
     <section class="dashboard-grid management-grid">
         @if ($canManageExpenses)
             <article class="glass-card management-card service-form-card">
@@ -46,6 +53,11 @@
 
     <section class="glass-card management-card">
         <form class="customer-toolbar" method="GET" action="{{ route('expenses.index') }}">
+            <select class="auth-input" name="type">
+                <option value="">All expense types</option>
+                <option value="job" @selected($type === 'job')>Job expenses</option>
+                <option value="company" @selected($type === 'company')>Company expenses</option>
+            </select>
             <select class="auth-input" name="status">
                 <option value="">All statuses</option>
                 @foreach ($statuses as $expenseStatus)
@@ -53,7 +65,7 @@
                 @endforeach
             </select>
             <button class="button" type="submit">Filter</button>
-            @if ($status !== '')
+            @if ($status !== '' || $type !== '')
                 <a class="button" href="{{ route('expenses.index') }}">Clear</a>
             @endif
         </form>
@@ -70,7 +82,7 @@
                         <button class="button" type="submit">Save</button>
                     </form>
                     <div class="expense-meta-row">
-                        <span>{{ $expense->job?->job_number ?? 'No job' }} / {{ $expense->submitter?->name ?? 'No submitter' }}</span>
+                        <span>{{ $expense->job?->job_number ?? 'Company expense' }} / {{ $expense->submitter?->name ?? 'No submitter' }}</span>
                         <span>Approval: {{ $expense->approver?->name ?? 'Not reviewed' }}{{ $expense->approved_at ? ' on '.$expense->approved_at->format('M j, Y') : '' }}</span>
                     </div>
                 @elseif ($canApproveExpenses)
@@ -79,7 +91,7 @@
                         @method('PATCH')
                         <div>
                             <strong>${{ number_format((float) $expense->amount, 2) }}</strong>
-                            <small>{{ $expense->job?->job_number ?? 'No job' }} / {{ $expense->submitter?->name ?? 'No submitter' }} / {{ $expense->vendor ?: 'No vendor' }}</small>
+                            <small>{{ $expense->job?->job_number ?? 'Company expense' }} / {{ $expense->submitter?->name ?? 'No submitter' }} / {{ $expense->vendor ?: 'No vendor' }}</small>
                         </div>
                         <select class="auth-input" name="status" required>
                             <option value="pending" @selected($expense->status === 'pending')>Pending</option>
@@ -100,7 +112,7 @@
                     <article class="expense-summary-row">
                         <div>
                             <strong>${{ number_format((float) $expense->amount, 2) }}</strong>
-                            <small>{{ $expense->job?->job_number ?? 'No job' }} / {{ $expense->category?->name ?? 'No category' }} / {{ $expense->vendor ?: 'No vendor' }}</small>
+                            <small>{{ $expense->job?->job_number ?? 'Company expense' }} / {{ $expense->category?->name ?? 'No category' }} / {{ $expense->vendor ?: 'No vendor' }}</small>
                         </div>
                         <span class="tenant-status tenant-status-{{ in_array($expense->status, ['approved', 'reimbursed']) ? 'active' : ($expense->status === 'rejected' ? 'archived' : 'suspended') }}">{{ Str::headline($expense->status) }}</span>
                         @if ($expense->receiptUrl())
@@ -114,7 +126,7 @@
                 <div class="empty-state">
                     <span class="eyebrow">No expenses</span>
                     <h2>{{ $canManageExpenses ? 'Log your first cost' : 'Submit your first expense' }}</h2>
-                    <p>Expenses can be attached to jobs and reviewed by management.</p>
+                    <p>Job expenses attach to jobs. Company expenses like shop rent stay unassigned and report as overhead.</p>
                 </div>
             @endforelse
         </div>

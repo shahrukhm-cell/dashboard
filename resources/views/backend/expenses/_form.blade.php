@@ -1,10 +1,10 @@
 <select class="auth-input" name="service_job_id">
-    <option value="">No job</option>
+    <option value="">Company expense - no job</option>
     @foreach ($jobs as $job)
         <option value="{{ $job->id }}" @selected((string) old('service_job_id', $expense->service_job_id) === (string) $job->id)>{{ $job->job_number }} - {{ $job->customer->name }}</option>
     @endforeach
 </select>
-<input class="auth-input" name="category_name" value="{{ old('category_name', $expense->category_name) }}" placeholder="Category">
+<input class="auth-input" name="category_name" value="{{ old('category_name', $expense->category_name) }}" placeholder="Category e.g. shop rent, fuel, supplies">
 @if ($canManageExpenses ?? false)
     <select class="auth-input" name="submitted_by">
         <option value="">No submitter</option>

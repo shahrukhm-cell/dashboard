@@ -19,6 +19,7 @@ class ExpenseController extends Controller
     {
         $tenant = $this->currentTenant($request);
         $status = (string) $request->query('status', '');
+        $type = (string) $request->query('type', '');
         $canManageExpenses = $request->user()->hasPermission('expenses.manage', $tenant);
         $canApproveExpenses = $request->user()->hasPermission('expenses.approve', $tenant);
 
@@ -27,6 +28,8 @@ class ExpenseController extends Controller
             ->with(['job.customer', 'category', 'submitter', 'approver'])
             ->when(! $canManageExpenses && ! $canApproveExpenses, fn ($query) => $query->where('submitted_by', $request->user()->id))
             ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->when($type === 'job', fn ($query) => $query->whereNotNull('service_job_id'))
+            ->when($type === 'company', fn ($query) => $query->whereNull('service_job_id'))
             ->latest('expense_date')
             ->paginate(15)
             ->withQueryString();
@@ -49,7 +52,10 @@ class ExpenseController extends Controller
             'users' => $tenant->users()->orderBy('name')->get(),
             'statuses' => Expense::statuses(),
             'status' => $status,
+            'type' => $type,
             'approvedTotal' => Expense::where('tenant_id', $tenant->id)->whereIn('status', [Expense::STATUS_APPROVED, Expense::STATUS_REIMBURSED])->sum('amount'),
+            'jobExpenseTotal' => Expense::where('tenant_id', $tenant->id)->whereNotNull('service_job_id')->whereIn('status', [Expense::STATUS_APPROVED, Expense::STATUS_REIMBURSED])->sum('amount'),
+            'companyExpenseTotal' => Expense::where('tenant_id', $tenant->id)->whereNull('service_job_id')->whereIn('status', [Expense::STATUS_APPROVED, Expense::STATUS_REIMBURSED])->sum('amount'),
             'canManageExpenses' => $canManageExpenses,
             'canApproveExpenses' => $canApproveExpenses,
         ]);

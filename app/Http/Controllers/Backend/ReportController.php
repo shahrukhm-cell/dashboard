@@ -30,7 +30,9 @@ class ReportController extends Controller
     public static function metrics(Tenant $tenant): array
     {
         $revenue = (float) CustomerPayment::where('tenant_id', $tenant->id)->where('status', CustomerPayment::STATUS_PAID)->sum('amount');
-        $approvedExpenses = (float) Expense::where('tenant_id', $tenant->id)->whereIn('status', [Expense::STATUS_APPROVED, Expense::STATUS_REIMBURSED])->sum('amount');
+        $jobExpenses = (float) Expense::where('tenant_id', $tenant->id)->whereNotNull('service_job_id')->whereIn('status', [Expense::STATUS_APPROVED, Expense::STATUS_REIMBURSED])->sum('amount');
+        $companyExpenses = (float) Expense::where('tenant_id', $tenant->id)->whereNull('service_job_id')->whereIn('status', [Expense::STATUS_APPROVED, Expense::STATUS_REIMBURSED])->sum('amount');
+        $approvedExpenses = $jobExpenses + $companyExpenses;
         $teamPaid = (float) TeamPayment::where('tenant_id', $tenant->id)->where('status', TeamPayment::STATUS_PAID)->sum('amount');
         $jobTotal = (float) ServiceJob::where('tenant_id', $tenant->id)->sum('total');
         $balanceDue = max(0, $jobTotal - $revenue);
@@ -38,6 +40,8 @@ class ReportController extends Controller
         return [
             'revenue' => $revenue,
             'approved_expenses' => $approvedExpenses,
+            'job_expenses' => $jobExpenses,
+            'company_expenses' => $companyExpenses,
             'team_paid' => $teamPaid,
             'profit' => $revenue - $approvedExpenses - $teamPaid,
             'job_total' => $jobTotal,
@@ -68,9 +72,8 @@ class ReportController extends Controller
             ->where('tenant_id', $tenant->id)
             ->whereIn('status', [Expense::STATUS_APPROVED, Expense::STATUS_REIMBURSED])
             ->where('expense_date', '>=', $startDate)
-            ->get(['amount', 'expense_date'])
-            ->groupBy(fn ($expense) => $expense->expense_date?->format('Y-m'))
-            ->map(fn ($expenses) => (float) $expenses->sum('amount'));
+            ->get(['amount', 'expense_date', 'service_job_id'])
+            ->groupBy(fn ($expense) => $expense->expense_date?->format('Y-m'));
 
         $teamPaid = TeamPayment::query()
             ->where('tenant_id', $tenant->id)
@@ -83,14 +86,19 @@ class ReportController extends Controller
         return $months->map(function ($month) use ($revenue, $expenses, $teamPaid): array {
             $key = $month->format('Y-m');
             $monthRevenue = (float) ($revenue[$key] ?? 0);
-            $monthExpenses = (float) ($expenses[$key] ?? 0);
+            $monthExpenseRows = $expenses[$key] ?? collect();
+            $monthExpenses = (float) $monthExpenseRows->whereNotNull('service_job_id')->sum('amount');
+            $monthCompanyExpenses = (float) $monthExpenseRows->whereNull('service_job_id')->sum('amount');
             $monthTeamPaid = (float) ($teamPaid[$key] ?? 0);
 
             return [
                 'label' => $month->format('M Y'),
                 'revenue' => $monthRevenue,
-                'costs' => $monthExpenses + $monthTeamPaid,
-                'profit' => $monthRevenue - $monthExpenses - $monthTeamPaid,
+                'costs' => $monthExpenses + $monthCompanyExpenses + $monthTeamPaid,
+                'job_expenses' => $monthExpenses,
+                'company_expenses' => $monthCompanyExpenses,
+                'team_paid' => $monthTeamPaid,
+                'profit' => $monthRevenue - $monthExpenses - $monthCompanyExpenses - $monthTeamPaid,
             ];
         })->all();
     }

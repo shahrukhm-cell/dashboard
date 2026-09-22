@@ -113,7 +113,13 @@ class User extends Authenticatable
 
     public function hasPermission(string $permission, Tenant $tenant): bool
     {
-        return $this->is_super_admin || ($this->canAccessTenant($tenant) && $this->rolesFor($tenant)->get()->flatMap->permissions->contains('slug', $permission));
+        if ($this->is_super_admin || ! $this->canAccessTenant($tenant)) {
+            return $this->is_super_admin;
+        }
+
+        $permissions = $this->rolesFor($tenant)->get()->flatMap->permissions;
+
+        return $permissions->contains('slug', '*') || $permissions->contains('slug', $permission);
     }
 
     public function rolesFor(Tenant $tenant): BelongsToMany

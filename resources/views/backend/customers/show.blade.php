@@ -5,11 +5,14 @@
             <h2>{{ $customer->name }}</h2>
         </div>
         <div class="management-actions">
+            @if (auth()->user()->hasPermission('tenant.settings.update', $tenant))
+                <a class="button button-primary" href="{{ route('invoice-settings.edit') }}">Invoice settings</a>
+            @endif
             @if (auth()->user()->hasPermission('jobs.manage', $tenant))
                 <a class="button button-primary" href="{{ route('jobs.create', ['customer_id' => $customer->id]) }}">Create job</a>
             @endif
             @if (auth()->user()->hasPermission('customers.manage', $tenant))
-                <a class="button" href="{{ route('customers.edit', $customer) }}">Edit</a>
+                <a class="button button-primary" href="{{ route('customers.edit', $customer) }}">Edit</a>
             @endif
             <a class="button" href="{{ route('customers.index') }}">Back</a>
         </div>

@@ -37,6 +37,11 @@
                 <option value="">All due states</option>
                 <option value="due_not_completed" @selected($due === 'due_not_completed')>Due and not completed</option>
             </select>
+            <select class="auth-input" name="period">
+                <option value="">Custom / all dates</option>
+                <option value="daily" @selected($period === 'daily')>Today</option>
+                <option value="monthly" @selected($period === 'monthly')>This month</option>
+            </select>
             <select class="auth-input" name="customer_id">
                 <option value="">All customers</option>
                 @foreach ($customers as $customer)
@@ -55,6 +60,16 @@
         </form>
     </section>
 
+    @if ($canViewFinance ?? true)
+        <section class="dashboard-grid management-grid finance-summary-grid">
+            <article class="glass-card stat-card"><span class="stat-label">Customer paid</span><strong class="stat-value">${{ number_format($financeSummary['customer_paid'], 2) }}</strong><span class="stat-change positive">Filtered payments</span></article>
+            <article class="glass-card stat-card"><span class="stat-label">Job expenses</span><strong class="stat-value">${{ number_format($financeSummary['job_expenses'], 2) }}</strong><span class="stat-change negative">Only assigned to jobs</span></article>
+            <article class="glass-card stat-card"><span class="stat-label">Team paid</span><strong class="stat-value">${{ number_format($financeSummary['team_paid'], 2) }}</strong><span class="stat-change negative">Filtered payouts</span></article>
+            <article class="glass-card stat-card"><span class="stat-label">Company expenses</span><strong class="stat-value">${{ number_format($financeSummary['company_expenses'], 2) }}</strong><span class="stat-change negative">Rent, shop, overhead</span></article>
+            <article class="glass-card stat-card activity-card"><span class="stat-label">Profit / loss</span><strong class="stat-value">${{ number_format($financeSummary['profit'], 2) }}</strong><span class="stat-change {{ $financeSummary['profit'] >= 0 ? 'positive' : 'negative' }}">Paid minus job, team, and company costs</span></article>
+        </section>
+    @endif
+
     <section class="glass-card management-card">
         <div class="service-list">
             @forelse ($jobs as $job)
@@ -66,7 +81,19 @@
                     <span>{{ $job->scheduled_at?->format('M j, Y g:i A') ?? 'Not scheduled' }}</span>
                     <span>{{ Str::headline($job->quote_status ?? 'draft') }} quote</span>
                     <span>{{ $job->before_photos_count ?? 0 }} before / {{ $job->after_photos_count ?? 0 }} after</span>
-                    @if ($canViewFinance ?? true)<span>${{ number_format((float) $job->total, 2) }}</span>@else<span>{{ $job->items_count ?? $job->items()->count() }} services</span>@endif
+                    @if ($canViewFinance ?? true)
+                        @php($jobPaid = (float) ($job->paid_customer_sum ?? 0))
+                        @php($jobExpense = (float) ($job->approved_expense_sum ?? 0))
+                        @php($teamPaid = (float) ($job->paid_team_sum ?? 0))
+                        @php($jobProfit = $jobPaid - $jobExpense - $teamPaid)
+                        <div class="job-finance-stack">
+                            <span>Total ${{ number_format((float) $job->total, 2) }}</span>
+                            <small>Paid ${{ number_format($jobPaid, 2) }}</small>
+                            <small>Expense ${{ number_format($jobExpense, 2) }}</small>
+                            <small>Team ${{ number_format($teamPaid, 2) }}</small>
+                            <strong class="{{ $jobProfit >= 0 ? 'stat-change positive' : 'stat-change negative' }}">Profit ${{ number_format($jobProfit, 2) }}</strong>
+                        </div>
+                    @else<span>{{ $job->items_count ?? $job->items()->count() }} services</span>@endif
                     <span class="tenant-status tenant-status-{{ in_array($job->status, ['completed']) ? 'active' : ($job->status === 'cancelled' ? 'archived' : 'suspended') }}">{{ Str::headline($job->status) }}</span>
                     @if (auth()->user()->hasPermission('jobs.manage', $tenant))
                         <a class="button" href="{{ route('jobs.edit', $job) }}">Edit</a>

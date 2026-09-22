@@ -39,9 +39,22 @@ class JobPhoto extends Model
     {
         return $this->belongsTo(User::class, 'uploaded_by');
     }
-
-    public function url(): string
+    public function url(): ?string
     {
-        return Storage::disk('public')->url($this->path);
+        return $this->path ? asset('storage/'.$this->path) : null;
     }
+    // public function url(): string
+    // {
+    //     $path = ltrim((string) $this->path, '/');
+
+    //     if (str_starts_with($path, 'storage/')) {
+    //         return asset($path);
+    //     }
+
+    //     if (str_starts_with($path, 'public/')) {
+    //         $path = substr($path, strlen('public/'));
+    //     }
+
+    //     return Storage::disk('public')->url($path);
+    // }
 }

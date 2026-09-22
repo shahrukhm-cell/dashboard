@@ -76,7 +76,10 @@
             @csrf
             <input class="auth-input" name="name" placeholder="Full name" required>
             <input class="auth-input" name="email" type="email" placeholder="Email address" required>
-            <input class="auth-input" name="password" type="password" placeholder="Temporary password" required>
+            <div class="password-input-wrap">
+                <input class="auth-input" name="password" type="password" placeholder="Temporary password" required>
+                <button class="password-toggle" type="button" data-password-toggle aria-label="Show password" aria-pressed="false">Show</button>
+            </div>
             <input class="auth-input" name="phone" placeholder="Phone">
             <input class="auth-input" name="address" placeholder="Address">
             <input class="auth-input" name="reference" placeholder="Reference">

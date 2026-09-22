@@ -340,7 +340,22 @@
     }
 }
 .job-row {
-    grid-template-columns: 1.2fr 1fr 0.6fr auto auto;
+    grid-template-columns: 1.2fr 1fr 0.8fr 0.8fr 1fr auto auto;
+}
+.job-finance-stack {
+    display: grid;
+    gap: 2px;
+}
+.job-finance-stack small {
+    display: block;
+    color: var(--muted);
+}
+.finance-summary-grid .stat-card {
+    min-height: 132px;
+}
+.finance-summary-grid .stat-value {
+    margin-top: 14px;
+    font-size: clamp(22px, 2vw, 30px);
 }
 .job-items-panel {
     margin-top: 18px;
@@ -356,8 +371,15 @@
 }
 .job-item-row {
     display: grid;
-    grid-template-columns: 1fr 140px;
+    grid-template-columns: 1fr 140px 140px auto;
     gap: 10px;
+}
+.job-item-remove {
+    white-space: nowrap;
+}
+.job-item-remove:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
 }
 .job-items-summary {
     display: grid;

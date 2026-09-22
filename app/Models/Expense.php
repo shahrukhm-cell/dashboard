@@ -19,6 +19,7 @@ class Expense extends Model
         'tenant_id',
         'service_job_id',
         'expense_category_id',
+        'category_name',
         'submitted_by',
         'status',
         'vendor',

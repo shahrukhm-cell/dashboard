@@ -2,24 +2,13 @@
 
 namespace App\Http\Controllers\Backend;
 
-use App\Http\Controllers\Controller;
-use App\Models\Customer;
-use App\Models\CustomerPayment;
-use App\Models\Expense;
-use App\Models\ExpenseCategory;
-use App\Models\JobPhoto;
-use App\Models\JobWorkEvent;
-use App\Models\Service;
-use App\Models\ServiceJob;
-use App\Models\ServiceJobStatusEvent;
-use App\Models\Team;
-use App\Models\TeamPayment;
-use App\Models\Tenant;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
+use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+
+use App\Http\Controllers\Controller;
+use App\Models\{Customer, CustomerPayment, Expense, ExpenseCategory, JobPhoto, JobWorkEvent, Service, ServiceJob, ServiceJobStatusEvent, Team, TeamPayment, Tenant};
 
 class ServiceJobController extends Controller
 {
@@ -33,13 +22,22 @@ class ServiceJobController extends Controller
         $teamId = (string) $request->query('team_id', '');
         $from = (string) $request->query('from', '');
         $to = (string) $request->query('to', '');
+        $period = (string) $request->query('period', '');
         $search = trim((string) $request->query('search'));
 
-        $jobs = ServiceJob::query()
+        if ($period === 'daily' && $from === '' && $to === '') {
+            $from = now()->toDateString();
+            $to = now()->toDateString();
+        }
+
+        if ($period === 'monthly' && $from === '' && $to === '') {
+            $from = now()->startOfMonth()->toDateString();
+            $to = now()->endOfMonth()->toDateString();
+        }
+
+        $jobQuery = ServiceJob::query()
             ->where('tenant_id', $tenant->id)
-            ->when($request->user()->isFieldStaff($tenant), fn ($query) => $this->forAssignedFieldStaff($query, $request->user()->id))
-            ->with(['customer', 'team', 'assignee', 'statusEvents' => fn ($query) => $query->latest('changed_at')])
-            ->withCount(['items', 'beforePhotos', 'afterPhotos'])
+            ->when($this->shouldRestrictToAssignedJobs($request, $tenant), fn ($query) => $this->forAssignedFieldStaff($query, $request->user()->id))
             ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->when($quoteStatus !== '', fn ($query) => $query->where('quote_status', $quoteStatus))
             ->when($customerId !== '', fn ($query) => $query->where('customer_id', $customerId))
@@ -52,7 +50,17 @@ class ServiceJobController extends Controller
                     $query->where('job_number', 'like', "%{$search}%")
                         ->orWhereHas('customer', fn ($query) => $query->where('name', 'like', "%{$search}%"));
                 });
-            })
+            });
+
+        $filteredJobIds = (clone $jobQuery)->pluck('id');
+        $financeSummary = $this->jobFinanceSummary($tenant, $filteredJobIds, $from, $to);
+
+        $jobs = $jobQuery
+            ->with(['customer', 'team', 'assignee', 'statusEvents' => fn ($query) => $query->latest('changed_at')])
+            ->withCount(['items', 'beforePhotos', 'afterPhotos'])
+            ->withSum(['customerPayments as paid_customer_sum' => fn ($query) => $query->where('status', CustomerPayment::STATUS_PAID)], 'amount')
+            ->withSum(['expenses as approved_expense_sum' => fn ($query) => $query->whereIn('status', [Expense::STATUS_APPROVED, Expense::STATUS_REIMBURSED])], 'amount')
+            ->withSum(['teamPayments as paid_team_sum' => fn ($query) => $query->where('status', TeamPayment::STATUS_PAID)], 'amount')
             ->latest()
             ->paginate(12)
             ->withQueryString();
@@ -69,7 +77,9 @@ class ServiceJobController extends Controller
             'teamId' => $teamId,
             'from' => $from,
             'to' => $to,
+            'period' => $period,
             'search' => $search,
+            'financeSummary' => $financeSummary,
             'customers' => Customer::where('tenant_id', $tenant->id)->orderBy('name')->get(),
             'teams' => Team::where('tenant_id', $tenant->id)->orderBy('name')->get(),
             'canViewFinance' => ! $request->user()->isFieldStaff($tenant),
@@ -111,11 +121,11 @@ class ServiceJobController extends Controller
                 'quote_status' => $data['quote_status'] ?? ServiceJob::QUOTE_DRAFT,
                 'scheduled_at' => $data['scheduled_at'] ?? null,
                 'service_address' => $data['service_address'] ?? null,
-                'discount' => $data['discount'] ?? 0,
+                'discount' => 0,
                 'notes' => $data['notes'] ?? null,
             ]);
 
-            $this->syncItems($job, $tenant, $data['items']);
+            $this->syncItems($job, $tenant, $data['items'], $data);
             $this->recordStatusChange($tenant, $job, null, $job->status, $request->user()->id, 'Job created.');
 
             return $job;
@@ -126,6 +136,7 @@ class ServiceJobController extends Controller
 
     public function show(Request $request, ServiceJob $job): View
     {
+      
         $tenant = $this->currentTenant($request, 'jobs.view');
         $this->ensureTenantJob($tenant, $job);
         $this->ensureVisibleJob($request, $tenant, $job);
@@ -201,12 +212,12 @@ class ServiceJobController extends Controller
                 'quote_status' => $data['quote_status'] ?? $job->quote_status,
                 'scheduled_at' => $data['scheduled_at'] ?? null,
                 'service_address' => $data['service_address'] ?? null,
-                'discount' => $data['discount'] ?? 0,
+                'discount' => 0,
                 'notes' => $data['notes'] ?? null,
             ]);
 
             $job->items()->delete();
-            $this->syncItems($job, $tenant, $data['items']);
+            $this->syncItems($job, $tenant, $data['items'], $data);
 
             if ($oldStatus !== $job->status) {
                 $this->recordStatusChange($tenant, $job, $oldStatus, $job->status, $request->user()->id, $request->input('status_notes'));
@@ -246,6 +257,7 @@ class ServiceJobController extends Controller
             'photo' => ['required', 'image', 'max:6144'],
             'caption' => ['nullable', 'string', 'max:180'],
         ]);
+
 
         $path = $request->file('photo')->store('job-photos/'.$tenant->id.'/'.$job->id, 'public');
 
@@ -287,6 +299,45 @@ class ServiceJobController extends Controller
         return back()->with('status', 'Job status updated.');
     }
 
+
+    private function jobFinanceSummary(Tenant $tenant, $jobIds, string $from, string $to): array
+    {
+        $jobTotal = (float) ServiceJob::whereIn('id', $jobIds)->sum('total');
+        $customerPaid = CustomerPayment::where('tenant_id', $tenant->id)
+            ->whereIn('service_job_id', $jobIds)
+            ->where('status', CustomerPayment::STATUS_PAID)
+            ->when($from !== '', fn ($query) => $query->whereDate('paid_at', '>=', $from))
+            ->when($to !== '', fn ($query) => $query->whereDate('paid_at', '<=', $to))
+            ->sum('amount');
+        $jobExpenses = Expense::where('tenant_id', $tenant->id)
+            ->whereIn('service_job_id', $jobIds)
+            ->whereIn('status', [Expense::STATUS_APPROVED, Expense::STATUS_REIMBURSED])
+            ->when($from !== '', fn ($query) => $query->whereDate('expense_date', '>=', $from))
+            ->when($to !== '', fn ($query) => $query->whereDate('expense_date', '<=', $to))
+            ->sum('amount');
+        $teamPaid = TeamPayment::where('tenant_id', $tenant->id)
+            ->whereIn('service_job_id', $jobIds)
+            ->where('status', TeamPayment::STATUS_PAID)
+            ->when($from !== '', fn ($query) => $query->whereDate('paid_at', '>=', $from))
+            ->when($to !== '', fn ($query) => $query->whereDate('paid_at', '<=', $to))
+            ->sum('amount');
+        $companyExpenses = Expense::where('tenant_id', $tenant->id)
+            ->whereNull('service_job_id')
+            ->whereIn('status', [Expense::STATUS_APPROVED, Expense::STATUS_REIMBURSED])
+            ->when($from !== '', fn ($query) => $query->whereDate('expense_date', '>=', $from))
+            ->when($to !== '', fn ($query) => $query->whereDate('expense_date', '<=', $to))
+            ->sum('amount');
+
+        return [
+            'job_total' => (float) $jobTotal,
+            'customer_paid' => (float) $customerPaid,
+            'job_expenses' => (float) $jobExpenses,
+            'team_paid' => (float) $teamPaid,
+            'company_expenses' => (float) $companyExpenses,
+            'profit' => (float) $customerPaid - (float) $jobExpenses - (float) $teamPaid - (float) $companyExpenses,
+        ];
+    }
+
     private function formData(Tenant $tenant, ServiceJob $job): array
     {
         return [
@@ -323,7 +374,7 @@ class ServiceJobController extends Controller
 
     private function ensureVisibleJob(Request $request, Tenant $tenant, ServiceJob $job): void
     {
-        if (! $request->user()->isFieldStaff($tenant)) {
+        if (! $this->shouldRestrictToAssignedJobs($request, $tenant)) {
             return;
         }
 
@@ -344,6 +395,11 @@ class ServiceJobController extends Controller
     private function fieldVisibleStatuses(): array
     {
         return [ServiceJob::STATUS_APPROVED, ServiceJob::STATUS_IN_PROGRESS, ServiceJob::STATUS_COMPLETED];
+    }
+
+    private function shouldRestrictToAssignedJobs(Request $request, Tenant $tenant): bool
+    {
+        return $request->user()->isFieldStaff($tenant);
     }
 
     private function forAssignedFieldStaff($query, int $userId)
@@ -486,23 +542,24 @@ class ServiceJobController extends Controller
             'quote_status' => ['nullable', Rule::in(ServiceJob::quoteStatuses())],
             'scheduled_at' => ['nullable', 'date'],
             'service_address' => ['nullable', 'string', 'max:180'],
+            'discount_type' => ['nullable', Rule::in(['fixed', 'percent'])],
             'discount' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'status_notes' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.service_id' => ['required', Rule::exists('services', 'id')->where('tenant_id', $tenant->id)],
-            'items.*.quantity' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
+            'items.*.quantity' => ['required', 'integer', 'min:1', 'max:999999'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0', 'max:999999.99'],
         ]);
     }
 
-    private function syncItems(ServiceJob $job, Tenant $tenant, array $items): void
+    private function syncItems(ServiceJob $job, Tenant $tenant, array $items, array $data): void
     {
         $subtotal = 0;
 
         foreach ($items as $item) {
             $service = Service::where('tenant_id', $tenant->id)->findOrFail($item['service_id']);
-            $quantity = (float) $item['quantity'];
+            $quantity = (int) $item['quantity'];
             $unitPrice = (float) $item['unit_price'];
             $lineTotal = round($quantity * $unitPrice, 2);
             $subtotal += $lineTotal;
@@ -517,9 +574,16 @@ class ServiceJobController extends Controller
             ]);
         }
 
-        $discount = (float) $job->discount;
+        $discountValue = (float) ($data['discount'] ?? 0);
+        $discount = ($data['discount_type'] ?? 'fixed') === 'percent'
+            ? round($subtotal * min($discountValue, 100) / 100, 2)
+            : round($discountValue, 2);
+
+        $discount = min($discount, $subtotal);
+
         $job->update([
             'subtotal' => $subtotal,
+            'discount' => $discount,
             'total' => max(0, round($subtotal - $discount, 2)),
         ]);
     }

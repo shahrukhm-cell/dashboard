@@ -11,7 +11,10 @@
         </div>
         <div class="auth-field">
             <label for="password">Password</label>
-            <input class="auth-input" id="password" type="password" name="password" required autocomplete="current-password">
+            <div class="password-input-wrap">
+                <input class="auth-input" id="password" type="password" name="password" required autocomplete="current-password">
+                <button class="password-toggle" type="button" data-password-toggle aria-label="Show password" aria-pressed="false">Show</button>
+            </div>
         </div>
         <div class="auth-options">
             <label><input type="checkbox" name="remember"> Remember me</label>

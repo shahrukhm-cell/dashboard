@@ -1,10 +1,15 @@
 <div class="customer-form-grid">
+    @php($lockedCustomer = $prefilledCustomer ?? null)
+    @php($selectedCustomerId = old('customer_id', $lockedCustomer?->id ?? $job->customer_id ?? request('customer_id')))
     <label class="auth-field">
         <span>Customer</span>
-        <select class="auth-input" name="customer_id" required>
+        @if ($lockedCustomer)
+            <input type="hidden" name="customer_id" value="{{ $lockedCustomer->id }}">
+        @endif
+        <select class="auth-input" name="customer_id" required @disabled($lockedCustomer)>
             <option value="">Select customer</option>
             @foreach ($customers as $customer)
-                <option value="{{ $customer->id }}" @selected((string) old('customer_id', $job->customer_id) === (string) $customer->id)>{{ $customer->name }}</option>
+                <option value="{{ $customer->id }}" @selected((string) $selectedCustomerId === (string) $customer->id)>{{ $customer->name }}</option>
             @endforeach
         </select>
     </label>
@@ -47,8 +52,15 @@
         <input class="auth-input" name="scheduled_at" type="datetime-local" value="{{ old('scheduled_at', $job->scheduled_at?->format('Y-m-d\TH:i')) }}">
     </label>
     <label class="auth-field">
+        <span>Discount type</span>
+        <select class="auth-input" name="discount_type">
+            <option value="fixed" @selected(old('discount_type', 'fixed') === 'fixed')>Fixed price</option>
+            <option value="percent" @selected(old('discount_type') === 'percent')>Percentage</option>
+        </select>
+    </label>
+    <label class="auth-field">
         <span>Discount</span>
-        <input class="auth-input" name="discount" type="number" step="0.01" min="0" value="{{ old('discount', $job->discount ?? 0) }}">
+        <input class="auth-input" name="discount" type="number" step="0.01" min="0" value="{{ old('discount', $job->discount ?? 0) }}" placeholder="Amount or percent">
     </label>
     <label class="auth-field customer-span-2">
         <span>Customer address / job location</span>
@@ -76,8 +88,9 @@
                         <option value="{{ $service->id }}" data-price="{{ number_format((float) $service->base_price, 2, '.', '') }}" @selected((string) ($item['service_id'] ?? '') === (string) $service->id)>{{ $service->name }} - base ${{ number_format((float) $service->base_price, 2) }}/{{ $service->unit_type }}</option>
                     @endforeach
                 </select>
-                <input class="auth-input" name="items[{{ $index }}][quantity]" type="number" min="0.01" step="0.01" value="{{ $item['quantity'] ?? 1 }}" required>
+                <input class="auth-input" name="items[{{ $index }}][quantity]" type="number" min="1" step="1" value="{{ (int) ($item['quantity'] ?? 1) }}" required>
                 <input class="auth-input" name="items[{{ $index }}][unit_price]" type="number" min="0" step="0.01" value="{{ $item['unit_price'] ?? 0 }}" placeholder="Job price" required>
+                <button class="button job-item-remove" type="button" data-remove-job-item aria-label="Remove service">Remove</button>
             </div>
         @endforeach
     </div>
@@ -94,7 +107,11 @@
 @endif
 
 <script>
-    document.querySelectorAll('.job-item-row select[name$="[service_id]"]').forEach((select) => {
+    const bindJobItemRow = (row) => {
+        const select = row.querySelector('select[name$="[service_id]"]');
+        if (!select || select.dataset.bound === 'true') return;
+
+        select.dataset.bound = 'true';
         const priceInput = select.closest('.job-item-row')?.querySelector('input[name$="[unit_price]"]');
         const defaultPrice = () => select.selectedOptions[0]?.dataset.price || '0.00';
 
@@ -107,6 +124,37 @@
                 priceInput.value = defaultPrice();
             }
         });
+    };
+
+    const reindexJobItems = () => {
+        document.querySelectorAll('.job-item-row').forEach((row, index) => {
+            row.querySelectorAll('select, input').forEach((field) => {
+                field.name = field.name.replace(/items\[\d+\]/, `items[${index}]`);
+            });
+        });
+    };
+
+    const updateRemoveButtons = () => {
+        const rows = document.querySelectorAll('.job-item-row');
+        rows.forEach((row) => {
+            const button = row.querySelector('[data-remove-job-item]');
+            if (button) button.disabled = rows.length === 1;
+        });
+    };
+
+    document.querySelectorAll('.job-item-row').forEach(bindJobItemRow);
+    updateRemoveButtons();
+
+    document.querySelector('.job-items-list')?.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-remove-job-item]');
+        if (!button) return;
+
+        const rows = document.querySelectorAll('.job-item-row');
+        if (rows.length <= 1) return;
+
+        button.closest('.job-item-row')?.remove();
+        reindexJobItems();
+        updateRemoveButtons();
     });
 
     document.querySelector('[data-add-job-item]')?.addEventListener('click', () => {
@@ -123,6 +171,8 @@
             if (field.name.endsWith('[unit_price]')) field.value = '0.00';
         });
         list.appendChild(clone);
+        bindJobItemRow(clone);
+        updateRemoveButtons();
     });
 </script>
 

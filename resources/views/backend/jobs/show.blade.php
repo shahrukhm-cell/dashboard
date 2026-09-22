@@ -5,7 +5,7 @@
             <h2>{{ $job->job_number }}</h2>
         </div>
         <div class="management-actions">
-            <a class="button" href="{{ route('jobs.quote.download', $job) }}">Download quote</a>
+            <a class="button button-primary" href="{{ route('jobs.quote.download', $job) }}">Download quote</a>
             @if ($job->status === 'completed' && $canViewFinance)
                 <a class="button button-primary" href="{{ route('jobs.invoice', $job) }}">Download invoice</a>
             @endif
@@ -111,11 +111,15 @@
                     <button class="button button-primary" type="submit">Upload image</button>
                 </form>
             @endif
+      
             <div class="job-items-summary">
                 @foreach (['before' => 'Before', 'after' => 'After'] as $type => $label)
                     <div class="job-summary-row"><span>{{ $label }}</span><strong>{{ $job->photos->where('type', $type)->count() }}</strong></div>
                     @foreach ($job->photos->where('type', $type) as $photo)
                         <div class="job-summary-row">
+                    {{-- @php
+                        dd($photo->url() );
+                    @endphp --}}
                             <span><a class="text-link" href="{{ $photo->url() }}" target="_blank" rel="noopener">{{ $photo->caption ?: $label.' image' }}</a> <small>{{ $photo->uploader?->name ?? 'Unknown' }}</small></span>
                             <strong>{{ $photo->created_at->format('M j') }}</strong>
                         </div>
@@ -231,6 +235,7 @@
                     </div>
                     <span class="tenant-status tenant-status-{{ in_array($expense->status, ['approved', 'reimbursed']) ? 'active' : ($expense->status === 'rejected' ? 'archived' : 'suspended') }}">{{ Str::headline($expense->status) }}</span>
                     @if ($expense->receiptUrl())
+                    
                         <a class="text-link" href="{{ $expense->receiptUrl() }}" target="_blank" rel="noopener">Receipt</a>
                     @endif
                     @if ($canApproveExpenses || $canManageExpenses)

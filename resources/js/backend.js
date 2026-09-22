@@ -39,6 +39,22 @@ document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
     localStorage.setItem('nexus-theme-mode', body.classList.contains('light-mode') ? 'light' : 'dark');
 });
 
+
+const sidebarCollapseToggle = document.querySelector('[data-sidebar-collapse-toggle]');
+const sidebarStorageKey = `nexus-sidebar-collapsed-${tenantId}`;
+const setSidebarCollapsed = (collapsed) => {
+    body.classList.toggle('sidebar-collapsed', collapsed);
+    sidebarCollapseToggle?.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    sidebarCollapseToggle?.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+    sidebarCollapseToggle?.setAttribute('title', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+};
+setSidebarCollapsed(localStorage.getItem(sidebarStorageKey) === 'true');
+sidebarCollapseToggle?.addEventListener('click', () => {
+    const collapsed = !body.classList.contains('sidebar-collapsed');
+    setSidebarCollapsed(collapsed);
+    localStorage.setItem(sidebarStorageKey, collapsed ? 'true' : 'false');
+});
+
 document.querySelector('[data-menu-toggle]')?.addEventListener('click', () => {
     document.querySelector('[data-sidebar]').classList.toggle('open');
     document.querySelector('[data-overlay]').classList.toggle('active');
@@ -46,4 +62,17 @@ document.querySelector('[data-menu-toggle]')?.addEventListener('click', () => {
 document.querySelector('[data-overlay]')?.addEventListener('click', () => {
     document.querySelector('[data-sidebar]').classList.remove('open');
     document.querySelector('[data-overlay]').classList.remove('active');
+});
+
+document.querySelectorAll('[data-password-toggle]').forEach((button) => {
+    button.addEventListener('click', () => {
+        const input = button.closest('.password-input-wrap')?.querySelector('input');
+        if (!input) return;
+
+        const isHidden = input.type === 'password';
+        input.type = isHidden ? 'text' : 'password';
+        button.textContent = isHidden ? 'Hide' : 'Show';
+        button.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+        button.setAttribute('aria-pressed', isHidden ? 'true' : 'false');
+    });
 });

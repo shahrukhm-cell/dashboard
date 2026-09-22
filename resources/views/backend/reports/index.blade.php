@@ -8,9 +8,10 @@
 
     <section class="dashboard-grid management-grid">
         <article class="glass-card stat-card"><span class="stat-label">Revenue received</span><strong class="stat-value">${{ number_format($metrics['revenue'], 2) }}</strong><span class="stat-change positive">${{ number_format($metrics['balance_due'], 2) }} balance due</span></article>
-        <article class="glass-card stat-card"><span class="stat-label">Approved expenses</span><strong class="stat-value">${{ number_format($metrics['approved_expenses'], 2) }}</strong><span class="stat-change negative">Job costs</span></article>
+        <article class="glass-card stat-card"><span class="stat-label">Job expenses</span><strong class="stat-value">${{ number_format($metrics['job_expenses'], 2) }}</strong><span class="stat-change negative">Assigned to jobs</span></article>
+        <article class="glass-card stat-card"><span class="stat-label">Company expenses</span><strong class="stat-value">${{ number_format($metrics['company_expenses'], 2) }}</strong><span class="stat-change negative">Rent, shop, overhead</span></article>
         <article class="glass-card stat-card"><span class="stat-label">Team payouts</span><strong class="stat-value">${{ number_format($metrics['team_paid'], 2) }}</strong><span class="stat-change negative">Paid to team</span></article>
-        <article class="glass-card stat-card"><span class="stat-label">Profit / loss</span><strong class="stat-value">${{ number_format($metrics['profit'], 2) }}</strong><span class="stat-change {{ $metrics['profit'] >= 0 ? 'positive' : 'negative' }}>Revenue minus costs</span></article>
+        <article class="glass-card stat-card"><span class="stat-label">Profit / loss</span><strong class="stat-value">${{ number_format($metrics['profit'], 2) }}</strong><span class="stat-change {{ $metrics['profit'] >= 0 ? 'positive' : 'negative' }}>Revenue minus job, company, and team costs</span></article>
         <article class="glass-card stat-card"><span class="stat-label">Jobs</span><strong class="stat-value">{{ number_format($metrics['jobs']) }}</strong><span class="stat-change positive">{{ number_format($metrics['completed_jobs']) }} completed</span></article>
         <article class="glass-card stat-card"><span class="stat-label">Clients</span><strong class="stat-value">{{ number_format($metrics['customers']) }}</strong><span class="stat-change positive">{{ number_format($metrics['hours']) }} work hours</span></article>
     </section>
@@ -31,7 +32,7 @@
                 </div>
             @endforeach
         </div>
-        <p class="customer-notes">Green is revenue, red is costs, blue/orange is profit or loss.</p>
+        <p class="customer-notes">Green is revenue, red is total costs. Job expenses, company overhead, and team payouts are kept separate in the totals.</p>
     </section>
 
     <section class="dashboard-grid management-grid">
