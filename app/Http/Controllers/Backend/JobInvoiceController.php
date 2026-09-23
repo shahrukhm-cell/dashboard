@@ -27,6 +27,19 @@ class JobInvoiceController extends Controller
         );
     }
 
+    public function current(Request $request, ServiceJob $job): Response
+    {
+        $tenant = $this->authorizedTenantJob($request, $job);
+
+        return $this->downloadDocument(
+            $tenant,
+            $job,
+            'Current customer invoice',
+            true,
+            'current-invoice'
+        );
+    }
+
     public function quote(Request $request, ServiceJob $job): Response
     {
         $tenant = $this->authorizedTenantJob($request, $job);
@@ -56,7 +69,7 @@ class JobInvoiceController extends Controller
 
     private function downloadDocument(Tenant $tenant, ServiceJob $job, string $title, bool $includePayments, string $type): Response
     {
-        $job->load(['customer', 'items.service', 'customerPayments']);
+        $job->load(['customer', 'items.service', 'customerPayments' => fn ($query) => $query->orderBy('paid_at')->orderBy('created_at')]);
 
         $html = view('backend.jobs.invoice', [
             'tenant' => $tenant,
@@ -104,3 +117,6 @@ class JobInvoiceController extends Controller
         return is_file($path) ? $path : null;
     }
 }
+
+
+

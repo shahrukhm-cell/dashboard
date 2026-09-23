@@ -13,7 +13,17 @@
     <section class="glass-card management-card">
         <form class="customer-toolbar" method="GET" action="{{ route('teams.index') }}">
             <input class="auth-input" name="search" value="{{ $search }}" placeholder="Search teams or members">
+            @if ($withDeleted ?? false)
+                <input type="hidden" name="with_deleted" value="1">
+            @endif
             <button class="button" type="submit">Search</button>
+            @if ($canViewDeleted ?? false)
+                @if ($withDeleted ?? false)
+                    <a class="button" href="{{ route('teams.index', ['search' => $search]) }}">Hide deleted</a>
+                @else
+                    <a class="button" href="{{ route('teams.index', ['search' => $search, 'with_deleted' => 1]) }}">Show deleted</a>
+                @endif
+            @endif
             @if ($search !== '')
                 <a class="button" href="{{ route('teams.index') }}">Clear</a>
             @endif
@@ -53,7 +63,7 @@
             @php($teamLead = $team->lead())
             <article class="glass-card tenant-card">
                 <div class="tenant-card-header">
-                    <span class="tenant-status tenant-status-{{ $team->is_active ? 'active' : 'archived' }}">{{ $team->is_active ? 'Active' : 'Inactive' }}</span>
+                    <span class="tenant-status tenant-status-{{ $team->trashed() ? 'archived' : ($team->is_active ? 'active' : 'archived') }}">{{ $team->trashed() ? 'Deleted' : ($team->is_active ? 'Active' : 'Inactive') }}</span>
                     <span class="eyebrow">{{ $team->users->count() }} members</span>
                 </div>
                 <h2><a href="{{ route('teams.show', $team) }}">{{ $team->name }}</a></h2>
@@ -61,6 +71,11 @@
                 <p><strong>Lead:</strong> {{ $teamLead?->name ?? 'No lead selected' }}</p>
                 <p><strong>Members:</strong> {{ $team->memberNames() ?: 'No members yet' }}</p>
                 <a class="button" href="{{ route('teams.show', $team) }}">View members</a>
+                @if ($team->trashed())
+                    <form class="team-form" method="POST" action="{{ route('teams.restore', $team) }}">@csrf @method('PATCH')<button class="button" type="submit">Restore team</button></form>
+                @else
+                    <form class="team-form" method="POST" action="{{ route('teams.destroy', $team) }}">@csrf @method('DELETE')<button class="button" type="submit">Delete team</button></form>
+                @endif
 
                 <form class="team-form" method="POST" action="{{ route('teams.update', $team) }}">
                     @csrf
@@ -97,4 +112,5 @@
         @endforelse
     </section>
 </x-backend-layout>
+
 

@@ -56,7 +56,17 @@
             </select>
             <input class="auth-input" name="from" type="date" value="{{ $from }}">
             <input class="auth-input" name="to" type="date" value="{{ $to }}">
+            @if ($withDeleted ?? false)
+                <input type="hidden" name="with_deleted" value="1">
+            @endif
             <button class="button" type="submit">Filter</button>
+            @if ($canViewDeleted ?? false)
+                @if ($withDeleted ?? false)
+                    <a class="button" href="{{ route('jobs.index', request()->except('with_deleted')) }}">Hide deleted</a>
+                @else
+                    <a class="button" href="{{ route('jobs.index', request()->query() + ['with_deleted' => 1]) }}">Show deleted</a>
+                @endif
+            @endif
         </form>
     </section>
 
@@ -76,7 +86,8 @@
                 <article class="service-row job-row">
                     <div>
                         <strong><a href="{{ route('jobs.show', $job) }}">{{ $job->job_number }}</a></strong>
-                        <small>{{ $job->customer->name }} - {{ $job->team?->name ?? 'Unassigned' }}</small>
+                        @if ($job->trashed())<small>Deleted</small>@endif
+                        <small>{{ $job->customer?->name ?? 'Deleted customer' }} - {{ $job->team?->name ?? 'Unassigned' }}</small>
                     </div>
                     <span>{{ $job->scheduled_at?->format('M j, Y g:i A') ?? 'Not scheduled' }}</span>
                     <span>{{ Str::headline($job->quote_status ?? 'draft') }} quote</span>
@@ -94,7 +105,7 @@
                             <strong class="{{ $jobProfit >= 0 ? 'stat-change positive' : 'stat-change negative' }}">Profit ${{ number_format($jobProfit, 2) }}</strong>
                         </div>
                     @else<span>{{ $job->items_count ?? $job->items()->count() }} services</span>@endif
-                    <span class="tenant-status tenant-status-{{ in_array($job->status, ['completed']) ? 'active' : ($job->status === 'cancelled' ? 'archived' : 'suspended') }}">{{ Str::headline($job->status) }}</span>
+                    <span class="tenant-status tenant-status-{{ $job->trashed() ? 'archived' : (in_array($job->status, ['completed']) ? 'active' : ($job->status === 'cancelled' ? 'archived' : 'suspended')) }}">{{ $job->trashed() ? 'Deleted' : Str::headline($job->status) }}</span>
                     @if (auth()->user()->hasPermission('jobs.manage', $tenant))
                         <a class="button" href="{{ route('jobs.edit', $job) }}">Edit</a>
                     @endif
@@ -110,3 +121,5 @@
         <div class="pagination-wrap">{{ $jobs->links() }}</div>
     </section>
 </x-backend-layout>
+
+

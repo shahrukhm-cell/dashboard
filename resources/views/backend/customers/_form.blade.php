@@ -1,3 +1,10 @@
+@if ($errors->any())
+    <div class="auth-errors customer-errors">
+        @foreach ($errors->all() as $error)
+            <p>{{ $error }}</p>
+        @endforeach
+    </div>
+@endif
 <div class="customer-form-grid">
     <label class="auth-field">
         <span>Name</span>
@@ -13,11 +20,11 @@
     </label>
     <label class="auth-field">
         <span>Email</span>
-        <input class="auth-input" name="email" type="email" value="{{ old('email', $customer->email) }}">
+        <input class="auth-input" name="email" required type="email" value="{{ old('email', $customer->email) }}">
     </label>
     <label class="auth-field">
         <span>Phone</span>
-        <input class="auth-input" name="phone" value="{{ old('phone', $customer->phone) }}">
+        <input class="auth-input" name="phone" required value="{{ old('phone', $customer->phone) }}">
     </label>
     <label class="auth-field customer-span-2">
         <span>Company</span>
@@ -37,7 +44,7 @@
     </label>
     <label class="auth-field">
         <span>Postal code</span>
-        <input class="auth-input" name="postal_code" value="{{ old('postal_code', $customer->postal_code) }}">
+        <input type="number" class="auth-input" name="postal_code" value="{{ old('postal_code', $customer->postal_code) }}">
     </label>
     <label class="auth-field customer-span-2">
         <span>Notes</span>
@@ -45,10 +52,3 @@
     </label>
 </div>
 
-@if ($errors->any())
-    <div class="auth-errors customer-errors">
-        @foreach ($errors->all() as $error)
-            <p>{{ $error }}</p>
-        @endforeach
-    </div>
-@endif

@@ -18,7 +18,7 @@
         </div>
         <div class="auth-options">
             <label><input type="checkbox" name="remember"> Remember me</label>
-            <a class="text-link" href="{{ route('register') }}">Create account</a>
+            {{-- <a class="text-link" href="{{ route('register') }}">Create account</a> --}}
         </div>
         <button class="button button-primary auth-submit" type="submit">Log in</button>
     </form>

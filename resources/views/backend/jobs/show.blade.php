@@ -1,18 +1,23 @@
 <x-backend-layout title="Job details">
     <section class="section-heading">
         <div>
-            <span class="eyebrow">{{ $job->customer->name }}</span>
+            <span class="eyebrow">{{ $job->customer?->name ?? 'Deleted customer' }}</span>
             <h2>{{ $job->job_number }}</h2>
         </div>
         <div class="management-actions">
             <a class="button button-primary" href="{{ route('jobs.quote.download', $job) }}">Download quote</a>
+            @if ($canViewFinance)
+                <a class="button button-primary" href="{{ route('jobs.current-invoice', $job) }}">Download current invoice</a>
+            @endif
             @if ($job->status === 'completed' && $canViewFinance)
                 <a class="button button-primary" href="{{ route('jobs.invoice', $job) }}">Download invoice</a>
             @endif
             @if (auth()->user()->hasPermission('jobs.manage', $tenant))
                 <a class="button button-primary" href="{{ route('jobs.edit', $job) }}">Edit job</a>
             @endif
-            <a class="button" href="{{ route('customers.show', $job->customer) }}">Back to customer</a>
+            @if ($job->customer)
+                <a class="button" href="{{ route('customers.show', $job->customer) }}">Back to customer</a>
+            @endif
         </div>
     </section>
 
@@ -33,13 +38,13 @@
             <span class="tenant-status tenant-status-{{ $job->status === 'completed' ? 'active' : ($job->status === 'cancelled' ? 'archived' : 'suspended') }}">{{ Str::headline($job->status) }}</span>
             <h2>Job summary</h2>
             <dl class="detail-list">
-                <dt>Customer</dt><dd><a class="text-link" href="{{ route('customers.show', $job->customer) }}">{{ $job->customer->name }}</a></dd>
-                <dt>Phone</dt><dd>{{ $job->customer->phone ?: 'Not added' }}</dd>
+                <dt>Customer</dt><dd>@if ($job->customer)<a class="text-link" href="{{ route('customers.show', $job->customer) }}">{{ $job->customer->name }}</a>@else Deleted customer @endif</dd>
+                <dt>Phone</dt><dd>{{ $job->customer?->phone ?: 'Not added' }}</dd>
                 <dt>Scheduled</dt><dd>{{ $job->scheduled_at?->format('M j, Y g:i A') ?? 'Not scheduled' }}</dd>
                 <dt>Team</dt><dd>{{ $job->team?->name ?? 'Unassigned' }}</dd>
                 <dt>Lead</dt><dd>{{ $job->team?->lead()?->name ?? 'No lead selected' }}</dd>
                 <dt>Assignee</dt><dd>{{ $job->assignee?->name ?? 'Unassigned' }}</dd>
-                <dt>Address</dt><dd>{{ $job->service_address ?: $job->customer->addressSummary() ?: 'Not added' }}</dd>
+                <dt>Address</dt><dd>{{ $job->service_address ?: ($job->customer?->addressSummary() ?: 'Not added') }}</dd>
                 <dt>Time logged</dt><dd>{{ round($job->timeEntries->sum('minutes') / 60, 2) }} hours</dd>
                 <dt>Quote</dt><dd>{{ Str::headline($job->quote_status ?? 'draft') }}</dd>
                 @if ($canViewFinance)
@@ -48,6 +53,10 @@
                     <dt>Balance due</dt><dd>${{ number_format(max(0, (float) $job->total - (float) $job->customerPayments->where('status', 'paid')->sum('amount')), 2) }}</dd>
                     <dt>Approved expenses</dt><dd>${{ number_format((float) $job->expenses->whereIn('status', ['approved', 'reimbursed'])->sum('amount'), 2) }}</dd>
                     <dt>Team paid</dt><dd>${{ number_format((float) $job->teamPayments->where('status', 'paid')->sum('amount'), 2) }}</dd>
+                    <dt>Current invoice</dt><dd><a class="text-link" href="{{ route('jobs.current-invoice', $job) }}">Download current invoice</a></dd>
+                    @if ($job->status === 'completed')
+                        <dt>Final invoice</dt><dd><a class="text-link" href="{{ route('jobs.invoice', $job) }}">Download final invoice</a></dd>
+                    @endif
                 @endif
             </dl>
         </article>
@@ -354,6 +363,10 @@
         <p class="customer-notes">{{ $job->notes ?: 'No notes yet.' }}</p>
     </section>
 </x-backend-layout>
+
+
+
+
 
 
 

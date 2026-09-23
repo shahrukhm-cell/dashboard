@@ -13,6 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
             \App\Http\Middleware\ResolveCurrentTenant::class,
+            \App\Http\Middleware\AuditWriteRequests::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

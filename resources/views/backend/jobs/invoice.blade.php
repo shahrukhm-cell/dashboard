@@ -312,6 +312,7 @@
             </tbody>
         </table>
 
+        @php($paidPayments = $job->customerPayments->where('status', 'paid')->sortBy('paid_at'))
         @php($balance = max(0, (float) $job->total - (float) $paid))
         <div class="totals">
             <table>
@@ -341,6 +342,30 @@
             </table>
         </div>
 
+        @if ($includePayments && $showPayments && $paidPayments->isNotEmpty())
+            <table>
+                <thead>
+                    <tr>
+                        <th>Payment date</th>
+                        <th>Method</th>
+                        <th>Reference</th>
+                        <th>Notes</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($paidPayments as $payment)
+                        <tr>
+                            <td>{{ $payment->paid_at?->format('M j, Y') ?? $payment->created_at->format('M j, Y') }}</td>
+                            <td>{{ Str::headline($payment->method) }}<small>{{ Str::headline($payment->status) }}</small></td>
+                            <td>{{ $payment->reference ?: '-' }}</td>
+                            <td>{{ $payment->notes ?: '-' }}</td>
+                            <td>${{ number_format((float) $payment->amount, 2) }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
         @if ($terms)
             <section class="note"><strong>Terms</strong><br>{{ $terms }}</section>
         @endif
@@ -354,3 +379,5 @@
 </body>
 
 </html>
+
+

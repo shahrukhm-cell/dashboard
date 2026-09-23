@@ -1,7 +1,7 @@
 <select class="auth-input" name="service_job_id">
     <option value="">No job</option>
     @foreach ($jobs as $job)
-        <option value="{{ $job->id }}" @selected((string) old('service_job_id', $payment->service_job_id) === (string) $job->id)>{{ $job->job_number }} - {{ $job->customer->name }}</option>
+        <option value="{{ $job->id }}" @selected((string) old('service_job_id', $payment->service_job_id) === (string) $job->id)>{{ $job->job_number }} - {{ $job->customer?->name ?? 'Deleted customer' }}</option>
     @endforeach
 </select>
 <select class="auth-input" name="customer_id">

@@ -25,7 +25,7 @@ class ExpenseController extends Controller
 
         $expenses = Expense::query()
             ->where('tenant_id', $tenant->id)
-            ->with(['job.customer', 'category', 'submitter', 'approver'])
+            ->with(['job.customer' => fn ($query) => $query->withTrashed(), 'category', 'submitter', 'approver'])
             ->when(! $canManageExpenses && ! $canApproveExpenses, fn ($query) => $query->where('submitted_by', $request->user()->id))
             ->when($status !== '', fn ($query) => $query->where('status', $status))
             ->when($type === 'job', fn ($query) => $query->whereNotNull('service_job_id'))
@@ -36,7 +36,7 @@ class ExpenseController extends Controller
 
         $jobs = ServiceJob::query()
             ->where('tenant_id', $tenant->id)
-            ->with('customer')
+            ->with(['customer' => fn ($query) => $query->withTrashed()])
             ->when(! $canManageExpenses && ! $canApproveExpenses, fn ($query) => $query->where(function ($query) use ($request): void {
                 $query->where('assigned_user_id', $request->user()->id)
                     ->orWhereHas('team.users', fn ($query) => $query->whereKey($request->user()->id));
@@ -189,4 +189,5 @@ class ExpenseController extends Controller
         return $request->validate($rules);
     }
 }
+
 

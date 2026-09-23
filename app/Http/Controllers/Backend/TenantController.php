@@ -2,17 +2,13 @@
 
 namespace App\Http\Controllers\Backend;
 
-use App\Http\Controllers\Controller;
-use App\Models\Permission;
-use App\Models\Plan;
-use App\Models\Role;
-use App\Models\Subscription;
-use App\Models\Tenant;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
+use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+
+use App\Http\Controllers\Controller;
+use App\Models\{Permission, Plan, Role, Subscription, Tenant};
 
 class TenantController extends Controller
 {
@@ -77,7 +73,7 @@ class TenantController extends Controller
 
         $request->session()->put('current_tenant_id', $tenant->id);
 
-        return back()->with('status', 'Workspace switched to '.$tenant->name.'.');
+        return redirect('/')->with('status', 'Workspace switched to '.$tenant->name.'.');
     }
 
     public function update(Request $request, Tenant $tenant): RedirectResponse

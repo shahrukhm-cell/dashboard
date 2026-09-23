@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Backend;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\ServiceJob;
 use App\Models\Team;
 use App\Models\TeamLeave;
@@ -19,8 +20,12 @@ class TeamController extends Controller
     {
         $tenant = $this->currentTenant($request, 'jobs.assign');
         $search = trim((string) $request->query('search'));
+        $canViewDeleted = $this->canViewDeleted($request, $tenant);
+        $withDeleted = $canViewDeleted && $request->boolean('with_deleted');
 
-        $teams = Team::where('tenant_id', $tenant->id)
+        $teams = Team::query()
+            ->when($withDeleted, fn ($query) => $query->withTrashed())
+            ->where('tenant_id', $tenant->id)
             ->with('users')
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($query) use ($search): void {
@@ -43,7 +48,7 @@ class TeamController extends Controller
     public function show(Request $request, Team $team): View
     {
         $tenant = $this->currentTenant($request, 'jobs.assign');
-        $this->ensureTenantTeam($tenant, $team);
+        $this->ensureTenantTeam($request, $tenant, $team);
 
         $team->load([
             'users.roles' => fn ($query) => $query->wherePivot('tenant_id', $tenant->id),
@@ -61,7 +66,7 @@ class TeamController extends Controller
     public function member(Request $request, Team $team, User $user): View
     {
         $tenant = $this->currentTenant($request, 'jobs.assign');
-        $this->ensureTenantTeam($tenant, $team);
+        $this->ensureTenantTeam($request, $tenant, $team);
         abort_unless($team->users()->whereKey($user->id)->exists(), 404);
 
         $assignedJobs = ServiceJob::where('tenant_id', $tenant->id)
@@ -127,7 +132,7 @@ class TeamController extends Controller
     public function update(Request $request, Team $team): RedirectResponse
     {
         $tenant = $this->currentTenant($request, 'jobs.assign');
-        $this->ensureTenantTeam($tenant, $team);
+        $this->ensureTenantTeam($request, $tenant, $team);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100', Rule::unique('teams')->where('tenant_id', $tenant->id)->ignore($team->id)],
@@ -149,10 +154,33 @@ class TeamController extends Controller
         return back()->with('status', 'Team updated.');
     }
 
+
+    public function destroy(Request $request, Team $team): RedirectResponse
+    {
+        $tenant = $this->currentTenant($request, 'jobs.assign');
+        $this->ensureTenantTeam($request, $tenant, $team);
+
+        $team->delete();
+        ActivityLog::record('team.deleted', $team, $request, 'Team soft deleted.');
+
+        return redirect()->route('teams.index')->with('status', 'Team deleted. Owner and super admin can still view it.');
+    }
+
+    public function restore(Request $request, Team $team): RedirectResponse
+    {
+        $tenant = $this->currentTenant($request, 'jobs.assign');
+        $this->ensureTenantTeam($request, $tenant, $team);
+        abort_unless($this->canViewDeleted($request, $tenant), 403);
+
+        $team->restore();
+        ActivityLog::record('team.restored', $team, $request, 'Team restored.');
+
+        return redirect()->route('teams.show', $team)->with('status', 'Team restored.');
+    }
     public function storeAttendance(Request $request, Team $team, User $user): RedirectResponse
     {
         $tenant = $this->currentTenant($request, 'jobs.assign');
-        $this->ensureTenantTeam($tenant, $team);
+        $this->ensureTenantTeam($request, $tenant, $team);
         abort_unless($team->users()->whereKey($user->id)->exists(), 404);
 
         $data = $request->validate([
@@ -184,12 +212,19 @@ class TeamController extends Controller
         return $tenant;
     }
 
-    private function ensureTenantTeam(Tenant $tenant, Team $team): void
+    private function ensureTenantTeam(Request $request, Tenant $tenant, Team $team): void
     {
         abort_unless((int) $team->tenant_id === (int) $tenant->id, 404);
+        abort_if($team->trashed() && ! $this->canViewDeleted($request, $tenant), 404);
     }
 
-    private function syncUsers(Team $team, array $userIds, ?int $leadUserId = null): void
+    private function canViewDeleted(Request $request, Tenant $tenant): bool
+    {
+        return $request->user()->is_super_admin
+            || (int) $tenant->created_by === (int) $request->user()->id
+            || $request->user()->hasTenantRole($tenant, 'tenant-owner');
+    }
+private function syncUsers(Team $team, array $userIds, ?int $leadUserId = null): void
     {
         $userIds = collect($userIds)
             ->filter()
@@ -207,5 +242,10 @@ class TeamController extends Controller
         $team->users()->sync($sync);
     }
 }
+
+
+
+
+
 
 

@@ -97,11 +97,12 @@
         <div class="section-heading"><div><span class="eyebrow">Recent</span><h2>Recent jobs</h2></div><a class="text-link" href="{{ route('jobs.index') }}">View jobs</a></div>
         <div class="report-list">
             @forelse ($recentJobs as $job)
-                <a class="report-row" href="{{ route('jobs.show', $job) }}"><span>{{ $job->job_number }} / {{ $job->customer->name }}</span><strong>${{ number_format((float) $job->total, 2) }}</strong></a>
+                <a class="report-row" href="{{ route('jobs.show', $job) }}"><span>{{ $job->job_number }} / {{ $job->customer?->name ?? 'Deleted customer' }}</span><strong>${{ number_format((float) $job->total, 2) }}</strong></a>
             @empty
                 <p class="customer-notes">No jobs yet.</p>
             @endforelse
         </div>
     </section>
 </x-backend-layout>
+
 

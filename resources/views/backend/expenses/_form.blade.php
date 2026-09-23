@@ -1,7 +1,7 @@
 <select class="auth-input" name="service_job_id">
     <option value="">Company expense - no job</option>
     @foreach ($jobs as $job)
-        <option value="{{ $job->id }}" @selected((string) old('service_job_id', $expense->service_job_id) === (string) $job->id)>{{ $job->job_number }} - {{ $job->customer->name }}</option>
+        <option value="{{ $job->id }}" @selected((string) old('service_job_id', $expense->service_job_id) === (string) $job->id)>{{ $job->job_number }} - {{ $job->customer?->name ?? 'Deleted customer' }}</option>
     @endforeach
 </select>
 <input class="auth-input" name="category_name" value="{{ old('category_name', $expense->category_name) }}" placeholder="Category e.g. shop rent, fuel, supplies">
@@ -29,4 +29,5 @@
 @if ($expense->receiptUrl())
     <a class="button" href="{{ $expense->receiptUrl() }}" target="_blank" rel="noopener">Receipt</a>
 @endif
+
 

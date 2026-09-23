@@ -12,6 +12,17 @@
     @if (session('status'))
         <p class="status-message">{{ session('status') }}</p>
     @endif
+    @if ($errors->any())
+        <div class="validation-message">
+            <strong>Please fix the following errors:</strong>
+
+            <ul>
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
     <section class="glass-card management-card">
         <div class="section-heading">

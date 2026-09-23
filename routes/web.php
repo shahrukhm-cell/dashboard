@@ -43,12 +43,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::get('reports', ReportController::class)->name('reports.index');
-    Route::resource('customers', CustomerController::class)->except(['destroy']);
+    Route::patch('customers/{customer}/restore', [CustomerController::class, 'restore'])->name('customers.restore')->withTrashed();
+    Route::resource('customers', CustomerController::class)->withTrashed(['show', 'edit', 'update']);
     Route::resource('services', ServiceController::class)->only(['index', 'store', 'edit', 'update']);
-    Route::resource('jobs', ServiceJobController::class)->except(['destroy']);
+    Route::patch('jobs/{job}/restore', [ServiceJobController::class, 'restore'])->name('jobs.restore')->withTrashed();
+    Route::resource('jobs', ServiceJobController::class)->withTrashed(['show', 'edit', 'update']);
     Route::post('jobs/{job}/status', [ServiceJobController::class, 'updateStatus'])->name('jobs.status.update');
     Route::post('jobs/{job}/quote', [ServiceJobController::class, 'updateQuote'])->name('jobs.quote.update');
     Route::get('jobs/{job}/quote', [JobInvoiceController::class, 'quote'])->name('jobs.quote.download');
+    Route::get('jobs/{job}/current-invoice', [JobInvoiceController::class, 'current'])->name('jobs.current-invoice');
     Route::post('jobs/{job}/photos', [ServiceJobController::class, 'storePhoto'])->name('jobs.photos.store');
     Route::get('jobs/{job}/invoice', JobInvoiceController::class)->name('jobs.invoice');
     Route::get('invoice-settings', [InvoiceSettingController::class, 'edit'])->name('invoice-settings.edit');
@@ -57,7 +60,8 @@ Route::middleware('auth')->group(function () {
     Route::post('jobs/{job}/work/break/start', [JobWorkController::class, 'startBreak'])->name('jobs.work.break.start');
     Route::post('jobs/{job}/work/break/end', [JobWorkController::class, 'endBreak'])->name('jobs.work.break.end');
     Route::post('jobs/{job}/work/end', [JobWorkController::class, 'end'])->name('jobs.work.end');
-    Route::resource('teams', TeamController::class)->only(['index', 'store', 'show', 'update']);
+    Route::patch('teams/{team}/restore', [TeamController::class, 'restore'])->name('teams.restore')->withTrashed();
+    Route::resource('teams', TeamController::class)->only(['index', 'store', 'show', 'update', 'destroy'])->withTrashed(['show', 'update']);
     Route::get('teams/{team}/members/{user}', [TeamController::class, 'member'])->name('teams.members.show');
     Route::post('teams/{team}/members/{user}/attendance', [TeamController::class, 'storeAttendance'])->name('teams.members.attendance.store');
     Route::resource('time-entries', TimeEntryController::class)->only(['index', 'store']);
@@ -88,6 +92,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/tenants/{tenant}/roles/{role}', [RoleController::class, 'destroy'])->name('tenant.roles.destroy');
     Route::post('/tenants/{tenant}/settings/theme', [TenantController::class, 'updateTheme'])->name('tenant.theme.update');
 });
+
+
 
 
 

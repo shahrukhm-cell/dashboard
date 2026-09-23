@@ -8,7 +8,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Customer, CustomerPayment, Expense, ExpenseCategory, JobPhoto, JobWorkEvent, Service, ServiceJob, ServiceJobStatusEvent, Team, TeamPayment, Tenant};
+use App\Models\{ActivityLog, Customer, CustomerPayment, Expense, ExpenseCategory, JobPhoto, JobWorkEvent, Service, ServiceJob, ServiceJobStatusEvent, Team, TeamPayment, Tenant};
 
 class ServiceJobController extends Controller
 {
@@ -24,6 +24,8 @@ class ServiceJobController extends Controller
         $to = (string) $request->query('to', '');
         $period = (string) $request->query('period', '');
         $search = trim((string) $request->query('search'));
+        $canViewDeleted = $this->canViewDeleted($request, $tenant);
+        $withDeleted = $canViewDeleted && $request->boolean('with_deleted');
 
         if ($period === 'daily' && $from === '' && $to === '') {
             $from = now()->toDateString();
@@ -138,7 +140,7 @@ class ServiceJobController extends Controller
     {
       
         $tenant = $this->currentTenant($request, 'jobs.view');
-        $this->ensureTenantJob($tenant, $job);
+        $this->ensureTenantJob($request, $tenant, $job);
         $this->ensureVisibleJob($request, $tenant, $job);
 
         $job->load(['customer', 'team.users', 'assignee', 'items.service', 'photos.uploader', 'timeEntries.user', 'workEvents.user', 'statusEvents.user', 'expenses.category', 'expenses.submitter', 'expenses.approver', 'customerPayments.customer', 'teamPayments.team', 'teamPayments.user']);
@@ -187,7 +189,7 @@ class ServiceJobController extends Controller
     public function edit(Request $request, ServiceJob $job): View
     {
         $tenant = $this->currentTenant($request, 'jobs.manage');
-        $this->ensureTenantJob($tenant, $job);
+        $this->ensureTenantJob($request, $tenant, $job);
 
         return view('backend.jobs.edit', $this->formData($tenant, $job->load('items')));
     }
@@ -195,7 +197,7 @@ class ServiceJobController extends Controller
     public function update(Request $request, ServiceJob $job): RedirectResponse
     {
         $tenant = $this->currentTenant($request, 'jobs.manage');
-        $this->ensureTenantJob($tenant, $job);
+        $this->ensureTenantJob($request, $tenant, $job);
         $data = $this->validated($request, $tenant);
         $oldStatus = $job->status;
 
@@ -227,10 +229,33 @@ class ServiceJobController extends Controller
         return redirect()->route('jobs.show', $job)->with('status', 'Job updated.');
     }
 
+
+    public function destroy(Request $request, ServiceJob $job): RedirectResponse
+    {
+        $tenant = $this->currentTenant($request, 'jobs.manage');
+        $this->ensureTenantJob($request, $tenant, $job);
+
+        $job->delete();
+        ActivityLog::record('job.deleted', $job, $request, 'Job soft deleted.');
+
+        return redirect()->route('jobs.index')->with('status', 'Job deleted. Owner and super admin can still view it.');
+    }
+
+    public function restore(Request $request, ServiceJob $job): RedirectResponse
+    {
+        $tenant = $this->currentTenant($request, 'jobs.manage');
+        $this->ensureTenantJob($request, $tenant, $job);
+        abort_unless($this->canViewDeleted($request, $tenant), 403);
+
+        $job->restore();
+        ActivityLog::record('job.restored', $job, $request, 'Job restored.');
+
+        return redirect()->route('jobs.show', $job)->with('status', 'Job restored.');
+    }
     public function updateQuote(Request $request, ServiceJob $job): RedirectResponse
     {
         $tenant = $this->currentTenant($request, 'jobs.manage');
-        $this->ensureTenantJob($tenant, $job);
+        $this->ensureTenantJob($request, $tenant, $job);
 
         $data = $request->validate([
             'quote_status' => ['required', Rule::in(ServiceJob::quoteStatuses())],
@@ -248,7 +273,7 @@ class ServiceJobController extends Controller
     public function storePhoto(Request $request, ServiceJob $job): RedirectResponse
     {
         $tenant = $this->currentTenant($request, 'jobs.status.update');
-        $this->ensureTenantJob($tenant, $job);
+        $this->ensureTenantJob($request, $tenant, $job);
         $this->ensureVisibleJob($request, $tenant, $job);
         abort_unless($this->canUploadJobPhotos($request, $tenant, $job), 403);
 
@@ -275,7 +300,7 @@ class ServiceJobController extends Controller
     public function updateStatus(Request $request, ServiceJob $job): RedirectResponse
     {
         $tenant = $this->currentTenant($request, 'jobs.status.update');
-        $this->ensureTenantJob($tenant, $job);
+        $this->ensureTenantJob($request, $tenant, $job);
         $this->ensureVisibleJob($request, $tenant, $job);
 
         abort_unless($this->canUpdateStatus($request, $tenant, $job), 403);
@@ -367,9 +392,17 @@ class ServiceJobController extends Controller
         return $tenant->users()->where('users.id', '!=', 1)->where('users.is_super_admin', false);
     }
 
-    private function ensureTenantJob(Tenant $tenant, ServiceJob $job): void
+    private function ensureTenantJob(Request $request, Tenant $tenant, ServiceJob $job): void
     {
         abort_unless((int) $job->tenant_id === (int) $tenant->id, 404);
+        abort_if($job->trashed() && ! $this->canViewDeleted($request, $tenant), 404);
+    }
+
+    private function canViewDeleted(Request $request, Tenant $tenant): bool
+    {
+        return $request->user()->is_super_admin
+            || (int) $tenant->created_by === (int) $request->user()->id
+            || $request->user()->hasTenantRole($tenant, 'tenant-owner');
     }
 
     private function ensureVisibleJob(Request $request, Tenant $tenant, ServiceJob $job): void
@@ -595,5 +628,13 @@ class ServiceJobController extends Controller
         return 'JOB-'.now()->format('Ymd').'-'.str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
 }
+
+
+
+
+
+
+
+
 
 

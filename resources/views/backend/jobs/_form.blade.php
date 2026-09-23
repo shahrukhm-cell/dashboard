@@ -53,14 +53,14 @@
     </label>
     <label class="auth-field">
         <span>Discount type</span>
-        <select class="auth-input" name="discount_type">
+        <select class="auth-input" name="discount_type" data-discount-type>
             <option value="fixed" @selected(old('discount_type', 'fixed') === 'fixed')>Fixed price</option>
             <option value="percent" @selected(old('discount_type') === 'percent')>Percentage</option>
         </select>
     </label>
     <label class="auth-field">
         <span>Discount</span>
-        <input class="auth-input" name="discount" type="number" step="0.01" min="0" value="{{ old('discount', $job->discount ?? 0) }}" placeholder="Amount or percent">
+        <input class="auth-input" name="discount" type="number" step="0.01" min="0" value="{{ old('discount', $job->discount ?? 0) }}" placeholder="Amount or percent" data-discount-value>
     </label>
     <label class="auth-field customer-span-2">
         <span>Customer address / job location</span>
@@ -90,11 +90,17 @@
                 </select>
                 <input class="auth-input" name="items[{{ $index }}][quantity]" type="number" min="1" step="1" value="{{ (int) ($item['quantity'] ?? 1) }}" required>
                 <input class="auth-input" name="items[{{ $index }}][unit_price]" type="number" min="0" step="0.01" value="{{ $item['unit_price'] ?? 0 }}" placeholder="Job price" required>
+                <strong class="job-line-total" data-line-total>$0.00</strong>
                 <button class="button job-item-remove" type="button" data-remove-job-item aria-label="Remove service">Remove</button>
             </div>
         @endforeach
     </div>
     <button class="button" type="button" data-add-job-item>Add service</button>
+    <div class="job-items-summary" data-job-summary>
+        <div class="job-summary-row"><span>Subtotal</span><strong data-job-subtotal>$0.00</strong></div>
+        <div class="job-summary-row"><span>Discount applied</span><strong data-job-discount>$0.00</strong></div>
+        <div class="job-summary-row total"><span>Total</span><strong data-job-total>$0.00</strong></div>
+    </div>
     <p class="form-error">Service base price is shown as a guide. Set the final job price on each line before saving.</p>
 </div>
 
@@ -107,73 +113,141 @@
 @endif
 
 <script>
-    const bindJobItemRow = (row) => {
-        const select = row.querySelector('select[name$="[service_id]"]');
-        if (!select || select.dataset.bound === 'true') return;
+    (() => {
+        const moneyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+        const itemsList = document.querySelector('.job-items-list');
+        const addButton = document.querySelector('[data-add-job-item]');
+        const discountType = document.querySelector('[data-discount-type]');
+        const discountValue = document.querySelector('[data-discount-value]');
+        const subtotalOutput = document.querySelector('[data-job-subtotal]');
+        const discountOutput = document.querySelector('[data-job-discount]');
+        const totalOutput = document.querySelector('[data-job-total]');
 
-        select.dataset.bound = 'true';
-        const priceInput = select.closest('.job-item-row')?.querySelector('input[name$="[unit_price]"]');
-        const defaultPrice = () => select.selectedOptions[0]?.dataset.price || '0.00';
+        const numberValue = (value) => {
+            const parsed = Number.parseFloat(value);
+            return Number.isFinite(parsed) ? parsed : 0;
+        };
 
-        if (priceInput && Number.parseFloat(priceInput.value || '0') === 0) {
-            priceInput.value = defaultPrice();
-        }
+        const money = (value) => moneyFormatter.format(Math.max(0, value));
 
-        select.addEventListener('change', () => {
-            if (priceInput) {
-                priceInput.value = defaultPrice();
-            }
-        });
-    };
+        const calculateTotals = () => {
+            let subtotal = 0;
 
-    const reindexJobItems = () => {
-        document.querySelectorAll('.job-item-row').forEach((row, index) => {
-            row.querySelectorAll('select, input').forEach((field) => {
-                field.name = field.name.replace(/items\[\d+\]/, `items[${index}]`);
+            document.querySelectorAll('.job-item-row').forEach((row) => {
+                const quantityInput = row.querySelector('input[name$="[quantity]"]');
+                const priceInput = row.querySelector('input[name$="[unit_price]"]');
+                const lineTotalOutput = row.querySelector('[data-line-total]');
+                const quantity = Math.max(0, numberValue(quantityInput?.value));
+                const unitPrice = Math.max(0, numberValue(priceInput?.value));
+                const lineTotal = quantity * unitPrice;
+
+                subtotal += lineTotal;
+                if (lineTotalOutput) lineTotalOutput.textContent = money(lineTotal);
             });
-        });
-    };
 
-    const updateRemoveButtons = () => {
-        const rows = document.querySelectorAll('.job-item-row');
-        rows.forEach((row) => {
-            const button = row.querySelector('[data-remove-job-item]');
-            if (button) button.disabled = rows.length === 1;
-        });
-    };
+            const rawDiscount = Math.max(0, numberValue(discountValue?.value));
+            const discount = discountType?.value === 'percent'
+                ? subtotal * Math.min(rawDiscount, 100) / 100
+                : rawDiscount;
+            const appliedDiscount = Math.min(discount, subtotal);
+            const total = Math.max(0, subtotal - appliedDiscount);
 
-    document.querySelectorAll('.job-item-row').forEach(bindJobItemRow);
-    updateRemoveButtons();
+            if (subtotalOutput) subtotalOutput.textContent = money(subtotal);
+            if (discountOutput) discountOutput.textContent = money(appliedDiscount);
+            if (totalOutput) totalOutput.textContent = money(total);
+        };
 
-    document.querySelector('.job-items-list')?.addEventListener('click', (event) => {
-        const button = event.target.closest('[data-remove-job-item]');
-        if (!button) return;
+        const bindJobItemRow = (row) => {
+            const select = row.querySelector('select[name$="[service_id]"]');
+            const priceInput = row.querySelector('input[name$="[unit_price]"]');
+            const quantityInput = row.querySelector('input[name$="[quantity]"]');
 
-        const rows = document.querySelectorAll('.job-item-row');
-        if (rows.length <= 1) return;
+            if (select && select.dataset.bound !== 'true') {
+                select.dataset.bound = 'true';
+                const defaultPrice = () => select.selectedOptions[0]?.dataset.price || '0.00';
 
-        button.closest('.job-item-row')?.remove();
-        reindexJobItems();
+                if (priceInput && numberValue(priceInput.value) === 0) {
+                    priceInput.value = defaultPrice();
+                }
+
+                select.addEventListener('change', () => {
+                    if (priceInput) priceInput.value = defaultPrice();
+                    calculateTotals();
+                });
+            }
+
+            [quantityInput, priceInput].forEach((input) => {
+                if (!input || input.dataset.bound === 'true') return;
+                input.dataset.bound = 'true';
+                input.addEventListener('input', calculateTotals);
+                input.addEventListener('change', calculateTotals);
+            });
+
+            calculateTotals();
+        };
+
+        const reindexJobItems = () => {
+            document.querySelectorAll('.job-item-row').forEach((row, index) => {
+                row.querySelectorAll('select, input').forEach((field) => {
+                    field.name = field.name.replace(/items\[\d+\]/, `items[${index}]`);
+                });
+            });
+        };
+
+        const updateRemoveButtons = () => {
+            const rows = document.querySelectorAll('.job-item-row');
+            rows.forEach((row) => {
+                const button = row.querySelector('[data-remove-job-item]');
+                if (button) button.disabled = rows.length === 1;
+            });
+        };
+
+        document.querySelectorAll('.job-item-row').forEach(bindJobItemRow);
         updateRemoveButtons();
-    });
+        calculateTotals();
 
-    document.querySelector('[data-add-job-item]')?.addEventListener('click', () => {
-        const list = document.querySelector('.job-items-list');
-        const first = list?.querySelector('.job-item-row');
-        if (!list || !first) return;
+        itemsList?.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-remove-job-item]');
+            if (!button) return;
 
-        const clone = first.cloneNode(true);
-        const index = list.querySelectorAll('.job-item-row').length;
-        clone.querySelectorAll('select, input').forEach((field) => {
-            field.name = field.name.replace(/items\[\d+\]/, `items[${index}]`);
-            if (field.tagName === 'SELECT') field.selectedIndex = 0;
-            if (field.name.endsWith('[quantity]')) field.value = '1';
-            if (field.name.endsWith('[unit_price]')) field.value = '0.00';
+            const rows = document.querySelectorAll('.job-item-row');
+            if (rows.length <= 1) return;
+
+            button.closest('.job-item-row')?.remove();
+            reindexJobItems();
+            updateRemoveButtons();
+            calculateTotals();
         });
-        list.appendChild(clone);
-        bindJobItemRow(clone);
-        updateRemoveButtons();
-    });
+
+        addButton?.addEventListener('click', () => {
+            const first = itemsList?.querySelector('.job-item-row');
+            if (!itemsList || !first) return;
+
+            const clone = first.cloneNode(true);
+            const index = itemsList.querySelectorAll('.job-item-row').length;
+            clone.querySelectorAll('select, input').forEach((field) => {
+                field.name = field.name.replace(/items\[\d+\]/, `items[${index}]`);
+                field.dataset.bound = 'false';
+                if (field.tagName === 'SELECT') field.selectedIndex = 0;
+                if (field.name.endsWith('[quantity]')) field.value = '1';
+                if (field.name.endsWith('[unit_price]')) field.value = '0.00';
+            });
+            clone.querySelectorAll('[data-line-total]').forEach((output) => {
+                output.textContent = '$0.00';
+            });
+            itemsList.appendChild(clone);
+            bindJobItemRow(clone);
+            updateRemoveButtons();
+            calculateTotals();
+        });
+
+        [discountType, discountValue].forEach((field) => {
+            field?.addEventListener('input', calculateTotals);
+            field?.addEventListener('change', calculateTotals);
+        });
+    })();
 </script>
+
+
 
 

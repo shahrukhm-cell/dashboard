@@ -22,7 +22,7 @@
                 <div class="section-heading"><div><span class="eyebrow">Recent jobs</span><h2>Workspace jobs</h2></div><a class="text-link" href="{{ route('customers.index') }}">Customers</a></div>
                 <div class="report-list">
                     @forelse ($recentJobs as $job)
-                        <a class="report-row" href="{{ route('jobs.show', $job) }}"><span>{{ $job->job_number }} · {{ $job->customer->name }}</span><strong>{{ Str::headline($job->status) }}</strong></a>
+                        <a class="report-row" href="{{ route('jobs.show', $job) }}"><span>{{ $job->job_number }} · {{ $job->customer?->name ?? 'Deleted customer' }}</span><strong>{{ Str::headline($job->status) }}</strong></a>
                     @empty
                         <p class="customer-notes">No jobs yet.</p>
                     @endforelse
@@ -42,4 +42,5 @@
         </section>
     @endif
 </x-backend-layout>
+
 
